@@ -299,6 +299,7 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&CasbinRule{},
 		&AuthzRole{},
+		&WeChatMpLoginCode{},
 	)
 	if err != nil {
 		return err

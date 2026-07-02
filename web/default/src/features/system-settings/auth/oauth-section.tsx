@@ -83,6 +83,11 @@ const oauthSchema = z.object({
   WeChatServerAddress: z.string(),
   WeChatServerToken: z.string(),
   WeChatAccountQRCodeImageURL: z.string(),
+  WeChatMpAuthEnabled: z.boolean(),
+  WeChatMpAppId: z.string(),
+  WeChatMpAppSecret: z.string(),
+  WeChatMpPagePath: z.string(),
+  WeChatMpMaxQrCodes: z.string(),
 })
 
 type OAuthFormValues = z.infer<typeof oauthSchema>
@@ -112,6 +117,11 @@ type FlatOAuthDefaults = {
   WeChatServerAddress: string
   WeChatServerToken: string
   WeChatAccountQRCodeImageURL: string
+  WeChatMpAuthEnabled: boolean
+  WeChatMpAppId: string
+  WeChatMpAppSecret: string
+  WeChatMpPagePath: string
+  WeChatMpMaxQrCodes: string
 }
 
 const oauthTabContentClassName =
@@ -146,6 +156,11 @@ const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
   WeChatServerAddress: defaults.WeChatServerAddress ?? '',
   WeChatServerToken: defaults.WeChatServerToken ?? '',
   WeChatAccountQRCodeImageURL: defaults.WeChatAccountQRCodeImageURL ?? '',
+  WeChatMpAuthEnabled: defaults.WeChatMpAuthEnabled,
+  WeChatMpAppId: defaults.WeChatMpAppId ?? '',
+  WeChatMpAppSecret: defaults.WeChatMpAppSecret ?? '',
+  WeChatMpPagePath: defaults.WeChatMpPagePath ?? '',
+  WeChatMpMaxQrCodes: defaults.WeChatMpMaxQrCodes ?? '',
 })
 
 const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
@@ -173,6 +188,11 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
   WeChatServerAddress: values.WeChatServerAddress,
   WeChatServerToken: values.WeChatServerToken,
   WeChatAccountQRCodeImageURL: values.WeChatAccountQRCodeImageURL,
+  WeChatMpAuthEnabled: values.WeChatMpAuthEnabled,
+  WeChatMpAppId: values.WeChatMpAppId,
+  WeChatMpAppSecret: values.WeChatMpAppSecret,
+  WeChatMpPagePath: values.WeChatMpPagePath,
+  WeChatMpMaxQrCodes: values.WeChatMpMaxQrCodes,
 })
 
 type OAuthSectionProps = {
@@ -296,13 +316,14 @@ export function OAuthSection(props: OAuthSectionProps) {
             <FormDirtyIndicator isDirty={form.formState.isDirty} />
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className='grid w-full grid-cols-6'>
+              <TabsList className='grid w-full grid-cols-7'>
                 <TabsTrigger value='github'>{t('GitHub')}</TabsTrigger>
                 <TabsTrigger value='discord'>{t('Discord')}</TabsTrigger>
                 <TabsTrigger value='oidc'>{t('OIDC')}</TabsTrigger>
                 <TabsTrigger value='telegram'>{t('Telegram')}</TabsTrigger>
                 <TabsTrigger value='linuxdo'>{t('LinuxDO')}</TabsTrigger>
                 <TabsTrigger value='wechat'>{t('WeChat')}</TabsTrigger>
+                <TabsTrigger value='wechat-mp'>{t('WeChat MP')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value='github' className={oauthTabContentClassName}>
@@ -894,6 +915,140 @@ export function OAuthSection(props: OAuthSectionProps) {
                     </FormItem>
                   )}
                 />
+              </TabsContent>
+
+              <TabsContent
+                value='wechat-mp'
+                className={oauthTabContentClassName}
+              >
+                <FormField
+                  control={form.control}
+                  name='WeChatMpAuthEnabled'
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>
+                          {t('Enable WeChat Mini Program Auth')}
+                        </FormLabel>
+                        <FormDescription>
+                          {t(
+                            'Allow users to sign in with WeChat Mini Program'
+                          )}
+                        </FormDescription>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='WeChatMpAppId'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('App ID')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t('Your Mini Program App ID')}
+                          autoComplete='off'
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                          name={field.name}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='WeChatMpAppSecret'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('App Secret')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type='password'
+                          placeholder={t('Your Mini Program App Secret')}
+                          autoComplete='new-password'
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                          name={field.name}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='WeChatMpPagePath'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Page Path')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t('pages/index/index')}
+                          autoComplete='off'
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                          name={field.name}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Mini Program page to open, leave empty for home page')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='WeChatMpMaxQrCodes'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Max QR Codes')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder='3'
+                          autoComplete='off'
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                          name={field.name}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Maximum concurrent QR codes, reuse after reaching limit')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
               </TabsContent>
             </Tabs>
           </SettingsForm>

@@ -137,6 +137,13 @@ var WeChatServerAddress = ""
 var WeChatServerToken = ""
 var WeChatAccountQRCodeImageURL = ""
 
+var WeChatMpAuthEnabled = false
+var WeChatMpAppId = ""
+var WeChatMpAppSecret = ""
+var WeChatMpToken = ""
+var WeChatMpPagePath = ""
+var WeChatMpMaxQrCodes = 3
+
 var TurnstileSiteKey = ""
 var TurnstileSecretKey = ""
 

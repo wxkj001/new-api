@@ -43,6 +43,7 @@ func InitOptionMap() {
 	common.OptionMap["LinuxDOOAuthEnabled"] = strconv.FormatBool(common.LinuxDOOAuthEnabled)
 	common.OptionMap["TelegramOAuthEnabled"] = strconv.FormatBool(common.TelegramOAuthEnabled)
 	common.OptionMap["WeChatAuthEnabled"] = strconv.FormatBool(common.WeChatAuthEnabled)
+	common.OptionMap["WeChatMpAuthEnabled"] = strconv.FormatBool(common.WeChatMpAuthEnabled)
 	common.OptionMap["TurnstileCheckEnabled"] = strconv.FormatBool(common.TurnstileCheckEnabled)
 	common.OptionMap["RegisterEnabled"] = strconv.FormatBool(common.RegisterEnabled)
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
@@ -128,6 +129,11 @@ func InitOptionMap() {
 	common.OptionMap["WeChatServerAddress"] = ""
 	common.OptionMap["WeChatServerToken"] = ""
 	common.OptionMap["WeChatAccountQRCodeImageURL"] = ""
+	common.OptionMap["WeChatMpAppId"] = ""
+	common.OptionMap["WeChatMpAppSecret"] = ""
+	common.OptionMap["WeChatMpToken"] = ""
+	common.OptionMap["WeChatMpPagePath"] = ""
+	common.OptionMap["WeChatMpMaxQrCodes"] = strconv.Itoa(common.WeChatMpMaxQrCodes)
 	common.OptionMap["TurnstileSiteKey"] = ""
 	common.OptionMap["TurnstileSecretKey"] = ""
 	common.OptionMap["QuotaForNewUser"] = strconv.Itoa(common.QuotaForNewUser)
@@ -292,6 +298,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.LinuxDOOAuthEnabled = boolValue
 		case "WeChatAuthEnabled":
 			common.WeChatAuthEnabled = boolValue
+		case "WeChatMpAuthEnabled":
+			common.WeChatMpAuthEnabled = boolValue
 		case "TelegramOAuthEnabled":
 			common.TelegramOAuthEnabled = boolValue
 		case "TurnstileCheckEnabled":
@@ -492,6 +500,16 @@ func updateOptionMap(key string, value string) (err error) {
 		common.WeChatServerToken = value
 	case "WeChatAccountQRCodeImageURL":
 		common.WeChatAccountQRCodeImageURL = value
+	case "WeChatMpAppId":
+		common.WeChatMpAppId = value
+	case "WeChatMpAppSecret":
+		common.WeChatMpAppSecret = value
+	case "WeChatMpToken":
+		common.WeChatMpToken = value
+	case "WeChatMpPagePath":
+		common.WeChatMpPagePath = value
+	case "WeChatMpMaxQrCodes":
+		common.WeChatMpMaxQrCodes, _ = strconv.Atoi(value)
 	case "TelegramBotToken":
 		common.TelegramBotToken = value
 	case "TelegramBotName":

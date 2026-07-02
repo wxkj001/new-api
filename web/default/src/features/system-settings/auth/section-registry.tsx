@@ -73,6 +73,11 @@ const AUTH_SECTIONS = [
           WeChatServerAddress: settings.WeChatServerAddress,
           WeChatServerToken: settings.WeChatServerToken,
           WeChatAccountQRCodeImageURL: settings.WeChatAccountQRCodeImageURL,
+          WeChatMpAuthEnabled: settings.WeChatMpAuthEnabled,
+          WeChatMpAppId: settings.WeChatMpAppId,
+          WeChatMpAppSecret: settings.WeChatMpAppSecret,
+          WeChatMpPagePath: settings.WeChatMpPagePath,
+          WeChatMpMaxQrCodes: settings.WeChatMpMaxQrCodes,
         }}
       />
     ),

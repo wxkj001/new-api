@@ -50,6 +50,10 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/oauth/wechat/bind", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.WeChatBind)
 		apiRouter.GET("/oauth/telegram/login", middleware.CriticalRateLimit(), controller.TelegramLogin)
 		apiRouter.GET("/oauth/telegram/bind", middleware.CriticalRateLimit(), controller.TelegramBind)
+		// WeChat Mini Program OAuth - scan-to-login flow
+		apiRouter.POST("/wechat-mp/url", middleware.CriticalRateLimit(), controller.WeChatMpGenerateURL)
+		apiRouter.GET("/wechat-mp/status", controller.WeChatMpCheckStatus)
+		apiRouter.POST("/wechat-mp/login", controller.WeChatMpLogin)
 		// Standard OAuth providers (GitHub, Discord, OIDC, LinuxDO) - unified route
 		apiRouter.GET("/oauth/:provider", middleware.CriticalRateLimit(), controller.HandleOAuth)
 		apiRouter.GET("/ratio_config", middleware.CriticalRateLimit(), controller.GetRatioConfig)

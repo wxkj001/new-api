@@ -34,6 +34,7 @@ type User struct {
 	DiscordId        string                     `json:"discord_id" gorm:"column:discord_id;index"`
 	OidcId           string                     `json:"oidc_id" gorm:"column:oidc_id;index"`
 	WeChatId         string                     `json:"wechat_id" gorm:"column:wechat_id;index"`
+	WeChatMpOpenId   string                     `json:"wechat_mp_openid" gorm:"column:wechat_mp_openid;index"`
 	TelegramId       string                     `json:"telegram_id" gorm:"column:telegram_id;index"`
 	VerificationCode string                     `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
 	AccessToken      *string                    `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
@@ -701,6 +702,14 @@ func (user *User) FillUserByWeChatId() error {
 	return nil
 }
 
+func (user *User) FillUserByWeChatMpOpenId() error {
+	if user.WeChatMpOpenId == "" {
+		return errors.New("WeChat MP openid 为空！")
+	}
+	DB.Where(User{WeChatMpOpenId: user.WeChatMpOpenId}).First(user)
+	return nil
+}
+
 func (user *User) FillUserByTelegramId() error {
 	if user.TelegramId == "" {
 		return errors.New("Telegram id 为空！")
@@ -718,6 +727,10 @@ func IsEmailAlreadyTaken(email string) bool {
 
 func IsWeChatIdAlreadyTaken(wechatId string) bool {
 	return DB.Unscoped().Where("wechat_id = ?", wechatId).Find(&User{}).RowsAffected == 1
+}
+
+func IsWeChatMpOpenIdAlreadyTaken(openId string) bool {
+	return DB.Unscoped().Where("wechat_mp_openid = ?", openId).Find(&User{}).RowsAffected == 1
 }
 
 func IsGitHubIdAlreadyTaken(githubId string) bool {

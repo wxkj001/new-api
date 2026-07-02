@@ -110,6 +110,7 @@ const (
 	MsgUserDiscordIdEmpty            = "user.discord_id_empty"
 	MsgUserOidcIdEmpty               = "user.oidc_id_empty"
 	MsgUserWeChatIdEmpty             = "user.wechat_id_empty"
+	MsgUserWeChatMpOpenIdEmpty       = "user.wechat_mp_openid_empty"
 	MsgUserTelegramIdEmpty           = "user.telegram_id_empty"
 	MsgUserTelegramNotBound          = "user.telegram_not_bound"
 	MsgUserLinuxDOIdEmpty            = "user.linux_do_id_empty"
@@ -293,6 +294,9 @@ const (
 	MsgOAuthTokenFailed     = "oauth.token_failed"
 	MsgOAuthUserInfoEmpty   = "oauth.user_info_empty"
 	MsgOAuthTrustLevelLow   = "oauth.trust_level_low"
+	MsgWeChatMpLoginNotEnabled      = "wechat_mp.login_not_enabled"
+	MsgWeChatMpLoginGenerateQRError = "wechat_mp.generate_qr_error"
+	MsgWeChatMpLoginBusy            = "wechat_mp.login_busy"
 )
 
 // Model layer error messages (for translation in controller)

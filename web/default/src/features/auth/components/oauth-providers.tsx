@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -30,6 +31,7 @@ import { cn } from '@/lib/utils'
 
 import { useOAuthLogin } from '../hooks/use-oauth-login'
 import type { SystemStatus } from '../types'
+import { WeChatMpLoginDialog } from './wechat-mp-login-dialog'
 
 type OAuthProvidersProps = {
   status: SystemStatus | null
@@ -55,6 +57,7 @@ export function OAuthProviders({
   isWeChatLoading = false,
 }: OAuthProvidersProps) {
   const { t } = useTranslation()
+  const [wechatMpOpen, setWechatMpOpen] = useState(false)
   const {
     isLoading,
     githubButtonText,
@@ -76,6 +79,15 @@ export function OAuthProviders({
       onClick: onWeChatLogin,
       icon: <IconWeChat className='h-4 w-4' />,
       disabled: isWeChatLoading,
+    })
+  }
+
+  if (status?.wechat_mp_login) {
+    providerButtons.push({
+      key: 'wechat-mp',
+      label: t('Continue with WeChat Mini Program'),
+      onClick: () => setWechatMpOpen(true),
+      icon: <IconWeChat className='h-4 w-4' />,
     })
   }
 
@@ -138,7 +150,8 @@ export function OAuthProviders({
   if (providerButtons.length === 0) return null
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <>
+      <div className={cn('space-y-3', className)}>
       <div className='relative'>
         <div className='absolute inset-0 flex items-center'>
           <span className='w-full border-t' />
@@ -168,5 +181,10 @@ export function OAuthProviders({
         )}
       </div>
     </div>
+    <WeChatMpLoginDialog
+      open={wechatMpOpen}
+      onOpenChange={setWechatMpOpen}
+    />
+    </>
   )
 }

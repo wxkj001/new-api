@@ -99,6 +99,7 @@ user.github_id_empty: "GitHub id 為空！"
 user.discord_id_empty: "discord id 為空！"
 user.oidc_id_empty: "oidc id 為空！"
 user.wechat_id_empty: "WeChat id 為空！"
+user.wechat_mp_openid_empty: "微信小程式 openid 為空！"
 user.telegram_id_empty: "Telegram id 為空！"
 user.telegram_not_bound: "該 Telegram 帳號未綁定"
 user.linux_do_id_empty: "Linux DO id 為空！"
@@ -248,6 +249,11 @@ oauth.connect_failed: "無法連接至 {{.Provider}} 伺服器，請稍後重試
 oauth.token_failed: "{{.Provider}} 獲取 Token 失敗，請檢查設定"
 oauth.user_info_empty: "{{.Provider}} 獲取使用者資訊為空，請檢查設定"
 oauth.trust_level_low: "Linux DO 信任等級未達到管理員設定的最低信任等級"
+
+# WeChat Mini Program messages
+wechat_mp.login_busy: "目前排隊人數較多，請稍後再試"
+wechat_mp.login_not_enabled: "微信小程式登入未啟用"
+wechat_mp.generate_qr_error: "生成微信小程式 QR 碼失敗"
 
 # Model layer error messages
 redeem.failed: "兌換失敗，請稍後重試"

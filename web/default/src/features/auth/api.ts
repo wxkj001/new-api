@@ -101,6 +101,45 @@ export async function wechatLoginByCode(code: string): Promise<ApiResponse> {
 }
 
 // ----------------------------------------------------------------------------
+// WeChat Mini Program
+// ----------------------------------------------------------------------------
+
+export type WeChatMpStatus = 'pending' | 'success' | 'failed' | 'expired'
+
+export interface WeChatMpUrlResponse {
+  success: boolean
+  message: string
+  data?: {
+    code: string
+    qr_image: string
+  }
+}
+
+export interface WeChatMpStatusResponse {
+  success: boolean
+  status?: WeChatMpStatus
+  message: string
+  data?: {
+    id?: number
+    username?: string
+    role?: number
+    status?: number
+  }
+}
+
+export async function generateWeChatMpUrl() {
+  const res = await api.post<WeChatMpUrlResponse>('/api/wechat-mp/url')
+  return res.data
+}
+
+export async function checkWeChatMpStatus(code: string) {
+  const res = await api.get<WeChatMpStatusResponse>('/api/wechat-mp/status', {
+    params: { code },
+  })
+  return res.data
+}
+
+// ----------------------------------------------------------------------------
 // Registration
 // ----------------------------------------------------------------------------
 
