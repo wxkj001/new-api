@@ -11,7 +11,7 @@ type WeChatMpLoginCode struct {
 	Id        int       `json:"id" gorm:"primaryKey;autoIncrement"`
 	Code      string    `json:"code" gorm:"type:varchar(64);uniqueIndex;not null"`   // UUID for frontend polling
 	Scene     string    `json:"scene" gorm:"type:varchar(32);uniqueIndex;not null"`  // scene value embedded in QR code
-	QrImage   []byte    `json:"-" gorm:"type:mediumblob"`                             // cached QR code image bytes (PNG)
+	QrImage   []byte    `json:"-" gorm:"type:bytea"`                             // cached QR code image bytes (PNG)
 	Status    string    `json:"status" gorm:"type:varchar(20);default:pending;not null"` // pending, success, failed, expired
 	UserId    int       `json:"user_id" gorm:"type:int;default:0"`
 	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
