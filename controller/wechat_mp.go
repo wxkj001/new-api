@@ -218,6 +218,12 @@ func WeChatMpLogin(c *gin.Context) {
 			})
 			return
 		}
+
+		// Auto-generate an API access token for new users
+		if err := generateUserAccessToken(&user); err != nil {
+			logger.LogWarn(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: generate token error: %s", err.Error()))
+			// Non-fatal: user can still regenerate manually
+		}
 	}
 
 	// Mark login code as success
@@ -305,4 +311,25 @@ func WeChatMpCheckStatus(c *gin.Context) {
 // Max 32 chars, only supports: 0-9, a-z, A-Z, and special chars !#$&'()*+,/:;=?@-._~
 func generateScene() string {
 	return "s_" + uuid.New().String()[:8]
+}
+
+// generateUserAccessToken generates and sets a random API access token for the user.
+func generateUserAccessToken(user *model.User) error {
+	randI := common.GetRandomInt(4)
+	key, err := common.GenerateRandomKey(29 + randI)
+	if err != nil {
+		return fmt.Errorf("generate key failed: %w", err)
+	}
+	user.SetAccessToken(key)
+
+	// Check for duplicate token
+	if model.DB.Where("access_token = ?", user.AccessToken).First(&model.User{}).RowsAffected != 0 {
+		// Retry with a new key
+		return generateUserAccessToken(user)
+	}
+
+	if err := user.Update(false); err != nil {
+		return fmt.Errorf("update user token failed: %w", err)
+	}
+	return nil
 }
