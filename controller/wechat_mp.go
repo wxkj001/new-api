@@ -314,22 +314,29 @@ func generateScene() string {
 }
 
 // generateUserAccessToken generates and sets a random API access token for the user.
+// Uses the existing business logic (GenerateKey + Token model) and the user's own group.
 func generateUserAccessToken(user *model.User) error {
-	randI := common.GetRandomInt(4)
-	key, err := common.GenerateRandomKey(29 + randI)
+	key, err := common.GenerateKey()
 	if err != nil {
 		return fmt.Errorf("generate key failed: %w", err)
 	}
-	user.SetAccessToken(key)
 
-	// Check for duplicate token
-	if model.DB.Where("access_token = ?", user.AccessToken).First(&model.User{}).RowsAffected != 0 {
-		// Retry with a new key
-		return generateUserAccessToken(user)
+	token := model.Token{
+		UserId:         user.Id,
+		Name:           "WeChat MP Auto",
+		Key:            key,
+		CreatedTime:    common.GetTimestamp(),
+		AccessedTime:   common.GetTimestamp(),
+		ExpiredTime:    -1,
+		RemainQuota:    0,
+		UnlimitedQuota: true,
+		Status:         1,
+		Group:          user.Group,
 	}
 
-	if err := user.Update(false); err != nil {
-		return fmt.Errorf("update user token failed: %w", err)
+	if err := token.Insert(); err != nil {
+		return fmt.Errorf("insert token failed: %w", err)
 	}
+
 	return nil
 }
