@@ -64,6 +64,9 @@ func SetApiRouter(router *gin.Engine) {
 		// :env separates test vs prod URLs so the operator can register each
 		// in Pancake's matching webhook slot; handler enforces env match.
 		apiRouter.POST("/waffo-pancake/webhook/:env", anonymousRequestBodyLimit, controller.WaffoPancakeWebhook)
+		// Aifadian payment webhook
+		apiRouter.POST("/aifadian/webhook", anonymousRequestBodyLimit, controller.AifadianWebhook)
+		apiRouter.GET("/aifadian/webhook", controller.AifadianWebhook)
 
 		// Universal secure verification routes
 		apiRouter.POST("/verify", middleware.UserAuth(), middleware.CriticalRateLimit(), controller.UniversalVerify)
@@ -98,6 +101,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.DELETE("/passkey", controller.PasskeyDelete)
 				selfRoute.GET("/aff", controller.GetAffCode)
 				selfRoute.GET("/topup/info", controller.GetTopUpInfo)
+				selfRoute.GET("/topup/aifadian", controller.AifadianPayURL)
 				selfRoute.GET("/topup/self", controller.GetUserTopUps)
 				selfRoute.POST("/topup", middleware.CriticalRateLimit(), controller.TopUp)
 				selfRoute.POST("/pay", middleware.CriticalRateLimit(), controller.RequestEpay)
@@ -212,6 +216,16 @@ func SetApiRouter(router *gin.Engine) {
 			customOAuthRoute.POST("/", controller.CreateCustomOAuthProvider)
 			customOAuthRoute.PUT("/:id", controller.UpdateCustomOAuthProvider)
 			customOAuthRoute.DELETE("/:id", controller.DeleteCustomOAuthProvider)
+		}
+		// Aifadian plan management (root only)
+		aifadianAdminRoute := apiRouter.Group("/aifadian")
+		aifadianAdminRoute.Use(middleware.RootAuth())
+		{
+			aifadianAdminRoute.GET("/plans", controller.AdminGetAifadianPlans)
+			aifadianAdminRoute.POST("/plans", controller.AdminCreateAifadianPlan)
+			aifadianAdminRoute.PUT("/plans/:id", controller.AdminUpdateAifadianPlan)
+			aifadianAdminRoute.DELETE("/plans/:id", controller.AdminDeleteAifadianPlan)
+			aifadianAdminRoute.GET("/orders", controller.AdminGetAifadianOrders)
 		}
 		performanceRoute := apiRouter.Group("/performance")
 		performanceRoute.Use(middleware.RootAuth())

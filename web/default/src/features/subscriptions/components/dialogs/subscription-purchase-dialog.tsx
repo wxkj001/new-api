@@ -44,6 +44,7 @@ import {
   paySubscriptionEpay,
   paySubscriptionWaffoPancake,
   paySubscriptionBalance,
+  paySubscriptionAifadian,
 } from '../../api'
 import { formatDuration, formatResetPeriod } from '../../lib'
 import type { PlanRecord } from '../../types'
@@ -51,6 +52,16 @@ import type { PlanRecord } from '../../types'
 interface PaymentMethod {
   type: string
   name?: string
+}
+
+interface AifadianPlan {
+  id: number
+  plan_id: string
+  name: string
+  plan_type: 'subscription' | 'topup'
+  subscription_plan_id: number
+  quota_amount: number
+  enabled: boolean
 }
 
 interface Props {
@@ -62,6 +73,7 @@ interface Props {
   enableWaffoPancake?: boolean
   enableOnlineTopUp?: boolean
   epayMethods?: PaymentMethod[]
+  aifadianPlans?: AifadianPlan[]
   purchaseLimit?: number
   purchaseCount?: number
   userQuota?: number
@@ -91,7 +103,16 @@ export function SubscriptionPurchaseDialog(props: Props) {
     props.enableWaffoPancake && !!plan.waffo_pancake_product_id
   const hasEpay =
     props.enableOnlineTopUp && (props.epayMethods || []).length > 0
-  const hasAnyPayment = hasStripe || hasCreem || hasWaffoPancake || hasEpay
+  // Check if there's an enabled Aifadian plan mapped to this subscription
+  const hasAifadian =
+    (props.aifadianPlans || []).some(
+      (p) =>
+        p.enabled &&
+        p.plan_type === 'subscription' &&
+        p.subscription_plan_id === plan.id
+    )
+  const hasAnyPayment =
+    hasStripe || hasCreem || hasWaffoPancake || hasEpay || hasAifadian
   const selectedEpayMethodLabel =
     (props.epayMethods || []).find((m) => m.type === selectedEpayMethod)
       ?.name ||
@@ -184,6 +205,39 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const isSafari =
     typeof navigator !== 'undefined' &&
     /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+
+  const handlePayAifadian = async () => {
+    // Find the Aifadian plan mapped to this subscription
+    const aifadianPlan = (props.aifadianPlans || []).find(
+      (p) =>
+        p.enabled &&
+        p.plan_type === 'subscription' &&
+        p.subscription_plan_id === plan.id
+    )
+    if (!aifadianPlan) {
+      toast.error(t('Aifadian plan not found for this subscription'))
+      return
+    }
+    setPaying(true)
+    try {
+      const res = await paySubscriptionAifadian({ plan_id: plan.id })
+      if (res.success && res.data?.url) {
+        toast.success(t('Redirecting to Aifadian...'))
+        window.location.href = res.data.url
+        props.onOpenChange(false)
+      } else {
+        toast.error(
+          res.message && res.message !== 'success'
+            ? res.message
+            : t('Payment request failed')
+        )
+      }
+    } catch {
+      toast.error(t('Payment request failed'))
+    } finally {
+      setPaying(false)
+    }
+  }
 
   const handlePayEpay = async () => {
     if (!selectedEpayMethod) {
@@ -368,7 +422,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
             <p className='text-muted-foreground text-xs'>
               {t('Select payment method')}
             </p>
-            {(hasStripe || hasCreem || hasWaffoPancake) && (
+            {(hasStripe || hasCreem || hasWaffoPancake || hasAifadian) && (
               <div className='grid grid-cols-2 gap-2 sm:flex'>
                 {hasStripe && (
                   <Button
@@ -398,6 +452,16 @@ export function SubscriptionPurchaseDialog(props: Props) {
                     disabled={paying || limitReached}
                   >
                     Waffo Pancake
+                  </Button>
+                )}
+                {hasAifadian && (
+                  <Button
+                    variant='outline'
+                    className='flex-1'
+                    onClick={handlePayAifadian}
+                    disabled={paying || limitReached}
+                  >
+                    {t('Aifadian')}
                   </Button>
                 )}
               </div>

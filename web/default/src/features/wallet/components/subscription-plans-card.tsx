@@ -20,6 +20,7 @@ import { Crown, RefreshCw, Sparkles, Check } from 'lucide-react'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useQuery } from '@tanstack/react-query'
 
 import {
   StatusBadge,
@@ -49,6 +50,7 @@ import {
   getPublicPlans,
   getSelfSubscriptionFull,
   updateBillingPreference,
+  getAifadianPlans,
 } from '@/features/subscriptions/api'
 import { SubscriptionPurchaseDialog } from '@/features/subscriptions/components/dialogs/subscription-purchase-dialog'
 import { formatDuration, formatResetPeriod } from '@/features/subscriptions/lib'
@@ -123,6 +125,19 @@ export function SubscriptionPlansCard({
     () => getEpayMethods(topupInfo?.pay_methods),
     [topupInfo?.pay_methods]
   )
+
+  // Fetch Aifadian plans
+  const {
+    data: aifadianData,
+  } = useQuery({
+    queryKey: ['aifadian-plans-for-subscription'],
+    queryFn: getAifadianPlans,
+  })
+  const aifadianPlans = useMemo(() => {
+    return (aifadianData?.data || []).filter(
+      (p) => p.enabled && p.plan_type === 'subscription'
+    )
+  }, [aifadianData])
 
   const fetchPlans = useCallback(async () => {
     try {
@@ -638,6 +653,7 @@ export function SubscriptionPlansCard({
         enableWaffoPancake={enableWaffoPancake}
         enableOnlineTopUp={enableOnlineTopUp}
         epayMethods={epayMethods}
+        aifadianPlans={aifadianPlans}
         userQuota={userQuota}
         onPurchaseSuccess={onPurchaseSuccess}
         purchaseLimit={

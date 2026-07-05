@@ -21,6 +21,7 @@ import { parseCurrencyDisplayType } from '@/lib/currency'
 import { CheckinSettingsSection } from '../general/checkin-settings-section'
 import { PricingSection } from '../general/pricing-section'
 import { QuotaSettingsSection } from '../general/quota-settings-section'
+import { AifadianSettingsSection } from '../integrations/aifadian-admin-section'
 import { PaymentSettingsSection } from '../integrations/payment-settings-section'
 import { RatioSettingsCard } from '../models/ratio-settings-card'
 import type { BillingSettings } from '../types'
@@ -199,6 +200,11 @@ const BILLING_SECTIONS = [
         }}
       />
     ),
+  },
+  {
+    id: 'aifadian',
+    titleKey: 'Aifadian',
+    build: () => <AifadianSettingsSection />,
   },
 ] as const
 

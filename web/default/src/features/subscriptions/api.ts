@@ -29,6 +29,8 @@ import type {
   SelfSubscriptionData,
 } from './types'
 
+import type { AifadianPayUrlResponse } from '../system-settings/integrations/aifadian-types'
+
 // ============================================================================
 // Admin Plan Management
 // ============================================================================
@@ -174,6 +176,39 @@ export async function paySubscriptionEpay(
     ...res.data,
     url: res.data.url || (res as unknown as { url?: string }).url,
   }
+}
+
+// ============================================================================
+// Aifadian Payment
+// ============================================================================
+
+export async function paySubscriptionAifadian(
+  data: SubscriptionPayRequest
+): Promise<AifadianPayUrlResponse> {
+  const res = await api.get('/api/topup/aifadian', {
+    params: { plan_id: data.plan_id, month: 1 },
+  })
+  return res.data
+}
+
+/**
+ * Get Aifadian plans for admin/frontend use
+ */
+export async function getAifadianPlans(): Promise<{
+  success: boolean
+  message?: string
+  data?: Array<{
+    id: number
+    plan_id: string
+    name: string
+    plan_type: 'subscription' | 'topup'
+    subscription_plan_id: number
+    quota_amount: number
+    enabled: boolean
+  }>
+}> {
+  const res = await api.get('/api/admin/aifadian/plans')
+  return res.data
 }
 
 // ============================================================================
