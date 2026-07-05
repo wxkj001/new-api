@@ -331,7 +331,7 @@ func generateUserAccessToken(user *model.User) error {
 		RemainQuota:    0,
 		UnlimitedQuota: true,
 		Status:         1,
-		Group:          user.Group,
+		Group:          "",
 	}
 
 	if err := token.Insert(); err != nil {
