@@ -13,7 +13,6 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -374,12 +373,12 @@ func AdminGetAifadianPlans(c *gin.Context) {
 }
 
 type adminCreateAifadianPlanRequest struct {
-	PlanId            string `json:"plan_id"`
-	Name              string `json:"name"`
-	PlanType          string `json:"plan_type"` // subscription or topup
-	SubscriptionPlanId int   `json:"subscription_plan_id"`
-	QuotaAmount       int64  `json:"quota_amount"`
-	Enabled           bool   `json:"enabled"`
+	PlanId             string `json:"plan_id"`
+	Name               string `json:"name"`
+	PlanType           string `json:"plan_type"` // subscription or topup
+	SubscriptionPlanId int    `json:"subscription_plan_id"`
+	QuotaAmount        int64  `json:"quota_amount"`
+	Enabled            bool   `json:"enabled"`
 }
 
 // AdminCreateAifadianPlan creates a new Aifadian plan mapping.
