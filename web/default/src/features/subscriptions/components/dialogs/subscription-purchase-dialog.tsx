@@ -220,10 +220,10 @@ export function SubscriptionPurchaseDialog(props: Props) {
     }
     setPaying(true)
     try {
-      const res = await paySubscriptionAifadian({ plan_id: plan.id })
+      const res = await paySubscriptionAifadian(aifadianPlan.plan_id)
       if (res.success && res.data?.url) {
         toast.success(t('Redirecting to Aifadian...'))
-        window.location.href = res.data.url
+        window.open(res.data.url, '_blank')
         props.onOpenChange(false)
       } else {
         toast.error(

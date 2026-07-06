@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,14 +17,27 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AifadianCallbackPayload represents the webhook payload from Aifadian.
-type AifadianCallbackPayload struct {
-	OrderID     string `json:"order_id"`
+// AifadianWebhookPayload represents the outer webhook envelope from Aifadian.
+type AifadianWebhookPayload struct {
+	EC   int                  `json:"ec"`
+	EM   string               `json:"em"`
+	Data AifadianWebhookData  `json:"data"`
+}
+
+// AifadianWebhookData is the inner data wrapper.
+type AifadianWebhookData struct {
+	Type  string              `json:"type"`
+	Order AifadianOrderData   `json:"order"`
+}
+
+// AifadianOrderData is the order detail from Aifadian webhook.
+type AifadianOrderData struct {
+	OutTradeNo  string `json:"out_trade_no"`
 	PlanID      string `json:"plan_id"`
 	TotalAmount string `json:"total_amount"`
 	Remark      string `json:"remark"`
-	Status      string `json:"status"`
-	CreateTime  string `json:"create_time"`
+	Status      int    `json:"status"`  // 2 = paid, 1 = pending
+	Month       int    `json:"month"`   // subscription duration in months
 }
 
 // AifadianPayRequest is the request to get an Aifadian payment URL.
@@ -70,134 +84,141 @@ func isAifadianWebhookEnabled() bool {
 func AifadianWebhook(c *gin.Context) {
 	if !isAifadianWebhookEnabled() {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 被拒绝 reason=webhook_disabled path=%q client_ip=%s", c.Request.RequestURI, c.ClientIP()))
-		c.JSON(http.StatusOK, gin.H{"code": 404, "msg": "webhook disabled"})
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("爱发电 webhook 读取请求体失败 path=%q client_ip=%s error=%q", c.Request.RequestURI, c.ClientIP(), err.Error()))
-		c.JSON(http.StatusOK, gin.H{"code": 400, "msg": "read body failed"})
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
 	logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 收到请求 path=%q client_ip=%s body=%s", c.Request.RequestURI, c.ClientIP(), string(body)))
 
-	var payload AifadianCallbackPayload
+	var payload AifadianWebhookPayload
 	if err := json.Unmarshal(body, &payload); err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("爱发电 webhook 解析 JSON 失败 path=%q client_ip=%s error=%q body=%s", c.Request.RequestURI, c.ClientIP(), err.Error(), string(body)))
-		c.JSON(http.StatusOK, gin.H{"code": 400, "msg": "invalid json"})
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
-	if payload.OrderID == "" {
-		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 缺少 order_id path=%q client_ip=%s", c.Request.RequestURI, c.ClientIP()))
-		c.JSON(http.StatusOK, gin.H{"code": 400, "msg": "missing order_id"})
+	if payload.EC != 200 {
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 业务错误 ec=%d em=%s", payload.EC, payload.EM))
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
+		return
+	}
+
+	order := payload.Data.Order
+	if order.OutTradeNo == "" {
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 缺少 out_trade_no path=%q client_ip=%s", c.Request.RequestURI, c.ClientIP()))
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
 	// Check if already processed (idempotency)
-	existingOrder := model.GetAifadianOrderByOrderId(payload.OrderID)
+	existingOrder := model.GetAifadianOrderByOrderId(order.OutTradeNo)
 	if existingOrder != nil {
 		if existingOrder.Processed {
-			logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 订单已处理 order_id=%s", payload.OrderID))
-			c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "already processed"})
+			logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 订单已处理 order_id=%s", order.OutTradeNo))
+			c.JSON(http.StatusOK, gin.H{"ec": 200})
 			return
 		}
 		// Already exists but not processed - continue
 	}
 
 	// Parse user info from remark
-	username, userId := parseAifadianRemark(payload.Remark)
+	username, userId := parseAifadianRemark(order.Remark)
 	if userId <= 0 {
-		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 无法从 remark 解析用户信息 order_id=%s remark=%s", payload.OrderID, payload.Remark))
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 无法从 remark 解析用户信息 order_id=%s remark=%s", order.OutTradeNo, order.Remark))
 		// Save the order anyway for manual processing
-		order := &model.AifadianOrder{
-			OrderId:     payload.OrderID,
+		orderEntry := &model.AifadianOrder{
+			OrderId:     order.OutTradeNo,
 			UserId:      0,
-			PlanId:      payload.PlanID,
-			Remark:      payload.Remark,
-			TotalAmount: payload.TotalAmount,
-			OrderStatus: payload.Status,
+			PlanId:      order.PlanID,
+			Remark:      order.Remark,
+			TotalAmount: order.TotalAmount,
+			OrderStatus: fmt.Sprintf("%d", order.Status),
 			Processed:   false,
 			ProcessMsg:  "无法解析用户信息，需要手动处理",
 		}
-		_ = model.CreateAifadianOrder(order)
-		c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "received, but user not found"})
+		_ = model.CreateAifadianOrder(orderEntry)
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
 	// Verify user exists
 	user, err := model.GetUserById(userId, false)
 	if err != nil {
-		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 用户不存在 order_id=%s user_id=%d username=%s", payload.OrderID, userId, username))
-		order := &model.AifadianOrder{
-			OrderId:     payload.OrderID,
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 用户不存在 order_id=%s user_id=%d username=%s", order.OutTradeNo, userId, username))
+		orderEntry := &model.AifadianOrder{
+			OrderId:     order.OutTradeNo,
 			UserId:      userId,
-			PlanId:      payload.PlanID,
-			Remark:      payload.Remark,
-			TotalAmount: payload.TotalAmount,
-			OrderStatus: payload.Status,
+			PlanId:      order.PlanID,
+			Remark:      order.Remark,
+			TotalAmount: order.TotalAmount,
+			OrderStatus: fmt.Sprintf("%d", order.Status),
 			Processed:   false,
 			ProcessMsg:  fmt.Sprintf("用户ID %d 不存在", userId),
 		}
-		_ = model.CreateAifadianOrder(order)
-		c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "user not found"})
+		_ = model.CreateAifadianOrder(orderEntry)
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
-	// Only process "paid" status
-	if payload.Status != "paid" {
-		logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 忽略非支付状态 order_id=%s status=%s", payload.OrderID, payload.Status))
-		order := &model.AifadianOrder{
-			OrderId:     payload.OrderID,
+	// Only process "paid" status (2)
+	if order.Status != 2 {
+		logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 忽略非支付状态 order_id=%s status=%d", order.OutTradeNo, order.Status))
+		orderEntry := &model.AifadianOrder{
+			OrderId:     order.OutTradeNo,
 			UserId:      userId,
-			PlanId:      payload.PlanID,
-			Remark:      payload.Remark,
-			TotalAmount: payload.TotalAmount,
-			OrderStatus: payload.Status,
+			PlanId:      order.PlanID,
+			Remark:      order.Remark,
+			TotalAmount: order.TotalAmount,
+			OrderStatus: fmt.Sprintf("%d", order.Status),
 			Processed:   false,
-			ProcessMsg:  fmt.Sprintf("非支付状态: %s", payload.Status),
+			ProcessMsg:  fmt.Sprintf("非支付状态: %d", order.Status),
 		}
-		_ = model.CreateAifadianOrder(order)
-		c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "received"})
+		_ = model.CreateAifadianOrder(orderEntry)
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
 	// Look up the Aifadian plan to determine what to do
-	aifadianPlan, err := model.GetAifadianPlanByPlanId(payload.PlanID)
+	aifadianPlan, err := model.GetAifadianPlanByPlanId(order.PlanID)
 	if err != nil {
-		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 未找到 plan_id order_id=%s plan_id=%s", payload.OrderID, payload.PlanID))
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 未找到 plan_id order_id=%s plan_id=%s", order.OutTradeNo, order.PlanID))
 		// Save order for manual processing
-		order := &model.AifadianOrder{
-			OrderId:     payload.OrderID,
+		orderEntry := &model.AifadianOrder{
+			OrderId:     order.OutTradeNo,
 			UserId:      userId,
-			PlanId:      payload.PlanID,
-			Remark:      payload.Remark,
-			TotalAmount: payload.TotalAmount,
-			OrderStatus: payload.Status,
+			PlanId:      order.PlanID,
+			Remark:      order.Remark,
+			TotalAmount: order.TotalAmount,
+			OrderStatus: fmt.Sprintf("%d", order.Status),
 			Processed:   false,
-			ProcessMsg:  fmt.Sprintf("未找到 plan_id: %s 的映射配置", payload.PlanID),
+			ProcessMsg:  fmt.Sprintf("未找到 plan_id: %s 的映射配置", order.PlanID),
 		}
-		_ = model.CreateAifadianOrder(order)
-		c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "plan not configured"})
+		_ = model.CreateAifadianOrder(orderEntry)
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
 	if !aifadianPlan.Enabled {
-		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook plan_id 未启用 order_id=%s plan_id=%s", payload.OrderID, payload.PlanID))
-		order := &model.AifadianOrder{
-			OrderId:     payload.OrderID,
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook plan_id 未启用 order_id=%s plan_id=%s", order.OutTradeNo, order.PlanID))
+		orderEntry := &model.AifadianOrder{
+			OrderId:     order.OutTradeNo,
 			UserId:      userId,
-			PlanId:      payload.PlanID,
-			Remark:      payload.Remark,
-			TotalAmount: payload.TotalAmount,
-			OrderStatus: payload.Status,
+			PlanId:      order.PlanID,
+			Remark:      order.Remark,
+			TotalAmount: order.TotalAmount,
+			OrderStatus: fmt.Sprintf("%d", order.Status),
 			Processed:   false,
 			ProcessMsg:  "该套餐未启用",
 		}
-		_ = model.CreateAifadianOrder(order)
-		c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "plan disabled"})
+		_ = model.CreateAifadianOrder(orderEntry)
+		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
@@ -208,38 +229,47 @@ func AifadianWebhook(c *gin.Context) {
 
 	if aifadianPlan.PlanType == "subscription" && aifadianPlan.SubscriptionPlanId > 0 {
 		// Process as subscription - need to create a subscription order and complete it
-		processOk, processMsg = processAifadianSubscriptionOrder(user.Id, aifadianPlan, payload)
+		processOk, processMsg = processAifadianSubscriptionOrder(user.Id, aifadianPlan, order)
 		if !processOk {
-			logger.LogError(c.Request.Context(), fmt.Sprintf("爱发电 webhook 处理订阅订单失败 order_id=%s user_id=%d plan_id=%s error=%s", payload.OrderID, userId, payload.PlanID, processMsg))
+			logger.LogError(c.Request.Context(), fmt.Sprintf("爱发电 webhook 处理订阅订单失败 order_id=%s user_id=%d plan_id=%s error=%s", order.OutTradeNo, userId, order.PlanID, processMsg))
 		} else {
-			logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 订阅订单成功 order_id=%s user_id=%d plan_id=%s", payload.OrderID, userId, payload.PlanID))
+			logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 订阅订单成功 order_id=%s user_id=%d plan_id=%s", order.OutTradeNo, userId, order.PlanID))
 		}
-	} else if aifadianPlan.PlanType == "topup" && aifadianPlan.QuotaAmount > 0 {
-		// Process as topup - add quota directly
-		err = model.IncreaseUserQuota(userId, int(aifadianPlan.QuotaAmount), true)
+	} else if aifadianPlan.PlanType == "topup" {
+		// Calculate quota from payment amount
+		amountFloat, _ := strconv.ParseFloat(order.TotalAmount, 64)
+		quota := int(aifadianPlan.QuotaAmount)
+		if quota <= 0 {
+			// Dynamic: convert payment amount to quota using system rate
+			quota = int(amountFloat / common.QuotaPerUnit)
+			if quota <= 0 {
+				quota = 1
+			}
+		}
+		err = model.IncreaseUserQuota(userId, quota, true)
 		if err != nil {
 			processOk = false
 			processMsg = fmt.Sprintf("增加额度失败: %s", err.Error())
-			logger.LogError(c.Request.Context(), fmt.Sprintf("爱发电 webhook 增加额度失败 order_id=%s user_id=%d plan_id=%s quota=%d error=%s", payload.OrderID, userId, payload.PlanID, aifadianPlan.QuotaAmount, err.Error()))
+			logger.LogError(c.Request.Context(), fmt.Sprintf("爱发电 webhook 增加额度失败 order_id=%s user_id=%d plan_id=%s quota=%d error=%s", order.OutTradeNo, userId, order.PlanID, quota, err.Error()))
 		} else {
 			processOk = true
-			processMsg = fmt.Sprintf("充值成功，增加额度: %d", aifadianPlan.QuotaAmount)
-			model.RecordTopupLog(userId, fmt.Sprintf("爱发电充值成功，订单: %s，充值金额: %s，获取额度: %d", payload.OrderID, payload.TotalAmount, aifadianPlan.QuotaAmount), c.ClientIP(), "aifadian", "aifadian")
-			logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 充值成功 order_id=%s user_id=%d plan_id=%s quota=%d", payload.OrderID, userId, payload.PlanID, aifadianPlan.QuotaAmount))
+			processMsg = fmt.Sprintf("充值成功，增加额度: %d (支付金额: %s)", quota, order.TotalAmount)
+			model.RecordTopupLog(userId, fmt.Sprintf("爱发电充值成功，订单: %s，充值金额: %s，获取额度: %d", order.OutTradeNo, order.TotalAmount, quota), c.ClientIP(), "aifadian", "aifadian")
+			logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 充值成功 order_id=%s user_id=%d plan_id=%s quota=%d", order.OutTradeNo, userId, order.PlanID, quota))
 		}
 	} else {
 		processMsg = fmt.Sprintf("plan_type=%s 配置无效", aifadianPlan.PlanType)
-		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 配置无效 order_id=%s plan_id=%s plan_type=%s", payload.OrderID, payload.PlanID, aifadianPlan.PlanType))
+		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 配置无效 order_id=%s plan_id=%s plan_type=%s", order.OutTradeNo, order.PlanID, aifadianPlan.PlanType))
 	}
 
 	// Save the order
 	createdOrder = &model.AifadianOrder{
-		OrderId:     payload.OrderID,
+		OrderId:     order.OutTradeNo,
 		UserId:      userId,
-		PlanId:      payload.PlanID,
-		Remark:      payload.Remark,
-		TotalAmount: payload.TotalAmount,
-		OrderStatus: payload.Status,
+		PlanId:      order.PlanID,
+		Remark:      order.Remark,
+		TotalAmount: order.TotalAmount,
+		OrderStatus: fmt.Sprintf("%d", order.Status),
 		Processed:   processOk,
 		ProcessMsg:  processMsg,
 		CompleteTime: func() int64 {
@@ -262,26 +292,26 @@ func AifadianWebhook(c *gin.Context) {
 		_ = model.CreateAifadianOrder(createdOrder)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "success"})
+	c.JSON(http.StatusOK, gin.H{"ec": 200})
 }
 
 // processAifadianSubscriptionOrder creates a subscription order and completes it.
-func processAifadianSubscriptionOrder(userId int, aifadianPlan *model.AifadianPlan, payload AifadianCallbackPayload) (bool, string) {
+func processAifadianSubscriptionOrder(userId int, aifadianPlan *model.AifadianPlan, order AifadianOrderData) (bool, string) {
 	// Get the subscription plan
 	subPlan, err := model.GetSubscriptionPlanById(aifadianPlan.SubscriptionPlanId)
 	if err != nil {
 		return false, fmt.Sprintf("未找到订阅套餐 ID %d", aifadianPlan.SubscriptionPlanId)
 	}
 
-	// Create trade no based on aifadian order_id
-	tradeNo := "AFD" + payload.OrderID
+	// Create trade no based on aifadian out_trade_no
+	tradeNo := "AFD" + order.OutTradeNo
 	if len(tradeNo) > 255 {
 		tradeNo = tradeNo[:255]
 	}
 
 	// Parse amount
 	amount := 0.0
-	if f, err := strconv.ParseFloat(payload.TotalAmount, 64); err == nil {
+	if f, err := strconv.ParseFloat(order.TotalAmount, 64); err == nil {
 		amount = f
 	}
 
@@ -301,8 +331,18 @@ func processAifadianSubscriptionOrder(userId int, aifadianPlan *model.AifadianPl
 	}
 
 	// Complete the subscription order
-	if err := model.CompleteSubscriptionOrder(tradeNo, common.GetJsonString(payload), model.PaymentProviderEpay, "aifadian"); err != nil {
+	if err := model.CompleteSubscriptionOrder(tradeNo, common.GetJsonString(order), model.PaymentProviderEpay, "aifadian"); err != nil {
 		return false, fmt.Sprintf("完成订阅订单失败: %s", err.Error())
+	}
+
+	// Extend subscription duration based on Afdian month count
+	if order.Month > 1 {
+		// Find the subscription just created and extend its end_time
+		addMonths := order.Month - 1
+		if err := model.ExtendUserSubscriptionEndTime(userId, subPlan.Id, addMonths); err != nil {
+			// Non-fatal: the subscription was already created with 1 month
+			logger.LogWarn(context.Background(), fmt.Sprintf("爱发电 扩展订阅时长失败 user_id=%d plan_id=%d months=%d error=%s", userId, subPlan.Id, addMonths, err.Error()))
+		}
 	}
 
 	return true, fmt.Sprintf("订阅套餐 '%s' 激活成功", subPlan.Title)
@@ -333,10 +373,19 @@ func AifadianPayURL(c *gin.Context) {
 	// Build remark: "用户名:wxkj;用户ID:1。请勿修改或者删除这里的信息以防充值不到账"
 	remark := fmt.Sprintf("用户名:%s;用户ID:%d。请勿修改或者删除这里的信息以防充值不到账", user.Username, userId)
 
+	// Look up the plan to check for SKU config
+	aifadianPlan, err := model.GetAifadianPlanByPlanId(planId)
+	hasSku := err == nil && aifadianPlan != nil && strings.TrimSpace(aifadianPlan.SkuConfig) != ""
+
 	// Build the Aifadian payment URL
 	v := url.Values{}
 	v.Set("plan_id", planId)
-	v.Set("product_type", "0")
+	if hasSku {
+		v.Set("product_type", "1")
+		v.Set("sku", strings.TrimSpace(aifadianPlan.SkuConfig))
+	} else {
+		v.Set("product_type", "0")
+	}
 	v.Set("month", strconv.Itoa(month))
 	v.Set("remark", remark)
 
@@ -355,7 +404,7 @@ func AifadianPayURL(c *gin.Context) {
 // Admin endpoints for Aifadian plan management
 
 // AdminGetAifadianPlans returns all Aifadian plan mappings.
-// GET /api/admin/aifadian/plans
+// GET /api/aifadian/plans
 func AdminGetAifadianPlans(c *gin.Context) {
 	plans, err := model.GetAllAifadianPlans()
 	if err != nil {
@@ -378,11 +427,12 @@ type adminCreateAifadianPlanRequest struct {
 	PlanType           string `json:"plan_type"` // subscription or topup
 	SubscriptionPlanId int    `json:"subscription_plan_id"`
 	QuotaAmount        int64  `json:"quota_amount"`
+	SkuConfig          string `json:"sku_config"`
 	Enabled            bool   `json:"enabled"`
 }
 
 // AdminCreateAifadianPlan creates a new Aifadian plan mapping.
-// POST /api/admin/aifadian/plans
+// POST /api/aifadian/plans
 func AdminCreateAifadianPlan(c *gin.Context) {
 	var req adminCreateAifadianPlanRequest
 	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
@@ -404,6 +454,7 @@ func AdminCreateAifadianPlan(c *gin.Context) {
 		PlanType:           req.PlanType,
 		SubscriptionPlanId: req.SubscriptionPlanId,
 		QuotaAmount:        req.QuotaAmount,
+		SkuConfig:          req.SkuConfig,
 		Enabled:            req.Enabled,
 	}
 	if err := model.CreateAifadianPlan(plan); err != nil {
@@ -418,7 +469,7 @@ func AdminCreateAifadianPlan(c *gin.Context) {
 }
 
 // AdminUpdateAifadianPlan updates an existing Aifadian plan mapping.
-// PUT /api/admin/aifadian/plans/:id
+// PUT /api/aifadian/plans/:id
 func AdminUpdateAifadianPlan(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -451,6 +502,7 @@ func AdminUpdateAifadianPlan(c *gin.Context) {
 	existing.PlanType = req.PlanType
 	existing.SubscriptionPlanId = req.SubscriptionPlanId
 	existing.QuotaAmount = req.QuotaAmount
+	existing.SkuConfig = req.SkuConfig
 	existing.Enabled = req.Enabled
 
 	if err := model.UpdateAifadianPlan(existing); err != nil {
@@ -465,7 +517,7 @@ func AdminUpdateAifadianPlan(c *gin.Context) {
 }
 
 // AdminDeleteAifadianPlan deletes an Aifadian plan mapping.
-// DELETE /api/admin/aifadian/plans/:id
+// DELETE /api/aifadian/plans/:id
 func AdminDeleteAifadianPlan(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -483,7 +535,7 @@ func AdminDeleteAifadianPlan(c *gin.Context) {
 }
 
 // AdminGetAifadianOrders returns Aifadian order records.
-// GET /api/admin/aifadian/orders
+// GET /api/aifadian/orders
 func AdminGetAifadianOrders(c *gin.Context) {
 	// For simplicity, return orders from the model package
 	// We'll add a proper query later

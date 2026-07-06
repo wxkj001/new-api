@@ -34,8 +34,8 @@ export interface AifadianPlan {
   plan_type: 'subscription' | 'topup'
   /** For subscription type: bound subscription plan ID */
   subscription_plan_id: number
-  /** For topup type: quota amount to add */
-  quota_amount: number
+  /** SKU configuration JSON */
+  sku_config: string
   /** Whether this plan is enabled */
   enabled: boolean
   /** Creation timestamp */
@@ -70,7 +70,7 @@ export interface CreateAifadianPlanRequest {
   name: string
   plan_type: 'subscription' | 'topup'
   subscription_plan_id: number
-  quota_amount: number
+  sku_config: string
   enabled: boolean
 }
 

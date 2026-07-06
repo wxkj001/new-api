@@ -16,6 +16,8 @@ type AifadianPlan struct {
 	SubscriptionPlanId int `json:"subscription_plan_id" gorm:"default:0"`
 	// For topup binding (quota amount)
 	QuotaAmount int64 `json:"quota_amount" gorm:"type:bigint;default:0"`
+	// SKU configuration JSON: [{"sku_id":"xxx","count":1}]
+	SkuConfig string `json:"sku_config" gorm:"type:text;default:''"`
 
 	Enabled   bool  `json:"enabled" gorm:"default:true"`
 	CreatedAt int64 `json:"created_at" gorm:"bigint"`

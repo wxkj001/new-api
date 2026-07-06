@@ -25,7 +25,7 @@ import { z } from 'zod'
 import { StaticDataTable } from '@/components/data-table/static/static-data-table'
 import { StaticRowActions } from '@/components/data-table/static/static-row-actions'
 import { Button } from '@/components/ui/button'
-import { Dialog } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -60,7 +60,8 @@ import type {
   AifadianPlan,
   CreateAifadianPlanRequest,
 } from './aifadian-types'
-import { safeNumberFieldProps } from '../utils/numeric-field'
+import { getAdminPlans } from '@/features/subscriptions/api'
+import type { PlanRecord } from '@/features/subscriptions/types'
 
 // ============================================================================
 // Types & Schema
@@ -70,8 +71,8 @@ const aifadianPlanSchema = z.object({
   plan_id: z.string().min(1),
   name: z.string().min(1),
   plan_type: z.enum(['subscription', 'topup']),
-  subscription_plan_id: z.number().int().min(0),
-  quota_amount: z.number().int().min(0),
+  subscription_plan_id: z.string(),
+  sku_config: z.string(),
   enabled: z.boolean(),
 })
 
@@ -101,14 +102,21 @@ function AifadianPlanDialog({
   const { t } = useTranslation()
   const isEditMode = !!editData
 
+  const { data: plansData } = useQuery({
+    queryKey: ['subscription-plans-admin'],
+    queryFn: getAdminPlans,
+    enabled: open,
+  })
+  const plans = plansData?.data ?? []
+
   const form = useForm<AifadianPlanFormValues>({
     resolver: zodResolver(aifadianPlanSchema),
     defaultValues: {
       plan_id: '',
       name: '',
       plan_type: 'topup',
-      subscription_plan_id: 0,
-      quota_amount: 0,
+      subscription_plan_id: '',
+      sku_config: '',
       enabled: true,
     },
   })
@@ -120,8 +128,8 @@ function AifadianPlanDialog({
         plan_id: editData.plan_id,
         name: editData.name,
         plan_type: editData.plan_type,
-        subscription_plan_id: editData.subscription_plan_id,
-        quota_amount: editData.quota_amount,
+        subscription_plan_id: String(editData.subscription_plan_id),
+        sku_config: editData.sku_config || '',
         enabled: editData.enabled,
       })
     } else {
@@ -129,8 +137,8 @@ function AifadianPlanDialog({
         plan_id: '',
         name: '',
         plan_type: 'topup',
-        subscription_plan_id: 0,
-        quota_amount: 0,
+        subscription_plan_id: '',
+        sku_config: '',
         enabled: true,
       })
     }
@@ -138,9 +146,19 @@ function AifadianPlanDialog({
 
   // Watch plan_type to conditionally enable fields
   const planType = form.watch('plan_type')
+  const selectedPlanId = form.watch('subscription_plan_id')
+
+  const selectedPlanName = useMemo(() => {
+    if (!selectedPlanId) return undefined
+    const p = plans.find((x: PlanRecord) => String(x.plan.id) === selectedPlanId)
+    return p ? p.plan.title : undefined
+  }, [plans, selectedPlanId])
 
   const handleSubmit = (values: AifadianPlanFormValues) => {
-    onSave(values)
+    onSave({
+      ...values,
+      subscription_plan_id: parseInt(values.subscription_plan_id) || 0,
+    })
     onOpenChange(false)
     form.reset()
   }
@@ -151,40 +169,22 @@ function AifadianPlanDialog({
       onOpenChange={(newOpen) => {
         onOpenChange(newOpen)
         if (!newOpen) {
-          // Reset form when dialog closes
           setTimeout(resetForm, 200)
         }
       }}
-      title={isEditMode ? t('Edit Aifadian Plan') : t('Add Aifadian Plan')}
-      description={t(
-        'Configure an Aifadian plan mapping for subscription or topup payments.'
-      )}
-      contentClassName='sm:max-w-[500px]'
-      contentHeight='auto'
-      bodyClassName='space-y-4'
-      footer={
-        <>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() => onOpenChange(false)}
-          >
-            {t('Cancel')}
-          </Button>
-          <Button
-            type='submit'
-            form={AIFADIAN_PLAN_FORM_ID}
-            disabled={isLoading}
-          >
-            {isLoading
-              ? t('Saving...')
-              : isEditMode
-                ? t('Update')
-                : t('Add')}
-          </Button>
-        </>
-      }
     >
+      <DialogContent className='sm:max-w-[500px]'>
+        <DialogHeader>
+          <DialogTitle>
+            {isEditMode ? t('Edit Aifadian Plan') : t('Add Aifadian Plan')}
+          </DialogTitle>
+          <DialogDescription>
+            {t(
+              'Configure an Aifadian plan mapping for subscription or topup payments.'
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <div className='-mx-4 -my-2 space-y-4 px-4'> 
       <Form {...form}>
         <form
           id={AIFADIAN_PLAN_FORM_ID}
@@ -277,22 +277,38 @@ function AifadianPlanDialog({
             name='subscription_plan_id'
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t('Subscription Plan ID')}</FormLabel>
+                <FormLabel>{t('Subscription Plan')}</FormLabel>
                 <FormControl>
-                  <Input
-                    type='number'
-                    min={0}
-                    placeholder='0'
+                  <Select
                     disabled={planType !== 'subscription'}
-                    className={cn(
-                      planType !== 'subscription' && 'opacity-50'
-                    )}
-                    {...safeNumberFieldProps(field)}
-                  />
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger
+                      className={cn(
+                        planType !== 'subscription' && 'opacity-50'
+                      )}
+                    >
+                      <SelectValue placeholder={t('Select a plan')}>
+                        {selectedPlanName}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plans.map((p: PlanRecord) => (
+                        <SelectItem
+                          key={p.plan.id}
+                          value={String(p.plan.id)}
+                        >
+                          {p.plan.title}
+                          {p.plan.enabled ? '' : ` (${t('Disabled')})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </FormControl>
                 <FormDescription>
                   {t(
-                    'The subscription plan ID to activate when this Aifadian plan is purchased.'
+                    'The subscription plan to activate when this Aifadian plan is purchased.'
                   )}
                 </FormDescription>
                 <FormMessage />
@@ -302,22 +318,27 @@ function AifadianPlanDialog({
 
           <FormField
             control={form.control}
-            name='quota_amount'
+            name='sku_config'
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t('Quota Amount')}</FormLabel>
+                <FormLabel>{t('SKU Config')}</FormLabel>
                 <FormControl>
                   <Input
-                    type='number'
-                    min={0}
-                    placeholder='0'
-                    disabled={planType !== 'topup'}
-                    className={cn(planType !== 'topup' && 'opacity-50')}
-                    {...safeNumberFieldProps(field)}
+                    placeholder='[{"sku_id":"xxx","count":1}]'
+                    autoComplete='off'
+                    value={field.value ?? ''}
+                    onChange={(event) =>
+                      field.onChange(event.target.value)
+                    }
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
                   />
                 </FormControl>
                 <FormDescription>
-                  {t('Quota amount to add when this topup plan is purchased.')}
+                  {t(
+                    'JSON array of SKU items. Leave empty for product-type 0.'
+                  )}
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -349,6 +370,28 @@ function AifadianPlanDialog({
           />
         </form>
       </Form>
+        </div>
+        <DialogFooter>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => onOpenChange(false)}
+          >
+            {t('Cancel')}
+          </Button>
+          <Button
+            type='submit'
+            form={AIFADIAN_PLAN_FORM_ID}
+            disabled={isLoading}
+          >
+            {isLoading
+              ? t('Saving...')
+              : isEditMode
+                ? t('Update')
+                : t('Add')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   )
 }
@@ -569,7 +612,7 @@ export function AifadianSettingsSection() {
                   <span className='font-mono text-sm'>
                     {plan.plan_type === 'subscription'
                       ? `Plan #${plan.subscription_plan_id}`
-                      : plan.quota_amount.toLocaleString()}
+                      : t('Dynamic')}
                   </span>
                 ),
               },
@@ -670,7 +713,7 @@ export function AifadianSettingsSection() {
                     <span className='font-mono'>
                       {plan.plan_type === 'subscription'
                         ? `Plan #${plan.subscription_plan_id}`
-                        : plan.quota_amount.toLocaleString()}
+                        : t('Dynamic')}
                     </span>
                   </div>
                   <div className='flex items-center gap-2'>

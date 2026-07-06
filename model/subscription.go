@@ -471,6 +471,18 @@ func downgradeUserGroupForSubscriptionTx(tx *gorm.DB, sub *UserSubscription, now
 	return target, nil
 }
 
+// ExtendUserSubscriptionEndTime extends the most recent active subscription's end_time
+func ExtendUserSubscriptionEndTime(userId, planId, months int) error {
+	var sub UserSubscription
+	err := DB.Where("user_id = ? AND plan_id = ?", userId, planId).
+		Order("id DESC").First(&sub).Error
+	if err != nil {
+		return err
+	}
+	newEnd := time.Unix(sub.EndTime, 0).AddDate(0, months, 0).Unix()
+	return DB.Model(&sub).Update("end_time", newEnd).Error
+}
+
 func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, source string) (*UserSubscription, error) {
 	if tx == nil {
 		return nil, errors.New("tx is nil")

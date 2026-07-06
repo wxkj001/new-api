@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 
 import type {
-  AifadianPlan,
   AifadianPlanResponse,
   AifadianPlansResponse,
   CreateAifadianPlanRequest,
@@ -34,7 +33,7 @@ import type {
  * Get all Aifadian plan mappings
  */
 export async function getAifadianPlans(): Promise<AifadianPlansResponse> {
-  const res = await api.get('/api/admin/aifadian/plans')
+  const res = await api.get('/api/aifadian/plans')
   return res.data
 }
 
@@ -44,7 +43,7 @@ export async function getAifadianPlans(): Promise<AifadianPlansResponse> {
 export async function createAifadianPlan(
   data: CreateAifadianPlanRequest
 ): Promise<AifadianPlanResponse> {
-  const res = await api.post('/api/admin/aifadian/plans', data)
+  const res = await api.post('/api/aifadian/plans', data)
   return res.data
 }
 
@@ -55,7 +54,7 @@ export async function updateAifadianPlan(
   id: number,
   data: UpdateAifadianPlanRequest
 ): Promise<AifadianPlanResponse> {
-  const res = await api.put(`/api/admin/aifadian/plans/${id}`, data)
+  const res = await api.put(`/api/aifadian/plans/${id}`, data)
   return res.data
 }
 
@@ -65,12 +64,13 @@ export async function updateAifadianPlan(
 export async function deleteAifadianPlan(
   id: number
 ): Promise<AifadianPlanResponse> {
-  const res = await api.delete(`/api/admin/aifadian/plans/${id}`)
+  const res = await api.delete(`/api/aifadian/plans/${id}`)
   return res.data
 }
 
 /**
- * Get Aifadian payment URL for a plan
+ * Navigate to Aifadian payment page (302 redirect).
+ * Opens in a new tab so the user doesn't leave the current page.
  */
 export async function getAifadianPayUrl(
   planId: string,
@@ -80,7 +80,7 @@ export async function getAifadianPayUrl(
   message?: string
   data?: { url: string; remark: string }
 }> {
-  const res = await api.get('/api/topup/aifadian', {
+  const res = await api.get('/api/user/topup/aifadian', {
     params: { plan_id: planId, month },
   })
   return res.data
