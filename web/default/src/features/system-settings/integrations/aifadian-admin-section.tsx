@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -143,6 +143,11 @@ function AifadianPlanDialog({
       })
     }
   }, [editData, form])
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) resetForm()
+  }, [open, resetForm])
 
   // Watch plan_type to conditionally enable fields
   const planType = form.watch('plan_type')

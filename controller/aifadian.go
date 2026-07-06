@@ -32,12 +32,13 @@ type AifadianWebhookData struct {
 
 // AifadianOrderData is the order detail from Aifadian webhook.
 type AifadianOrderData struct {
-	OutTradeNo  string `json:"out_trade_no"`
-	PlanID      string `json:"plan_id"`
-	TotalAmount string `json:"total_amount"`
-	Remark      string `json:"remark"`
-	Status      int    `json:"status"`  // 2 = paid, 1 = pending
-	Month       int    `json:"month"`   // subscription duration in months
+	OutTradeNo  string                   `json:"out_trade_no"`
+	PlanID      string                   `json:"plan_id"`
+	TotalAmount string                   `json:"total_amount"`
+	Remark      string                   `json:"remark"`
+	Status      int                      `json:"status"` // 2 = paid, 1 = pending
+	Month       int                      `json:"month"`  // subscription duration in months
+	SkuDetail   []map[string]interface{} `json:"sku_detail"`
 }
 
 // AifadianPayRequest is the request to get an Aifadian payment URL.
@@ -185,8 +186,15 @@ func AifadianWebhook(c *gin.Context) {
 		return
 	}
 
-	// Look up the Aifadian plan to determine what to do
-	aifadianPlan, err := model.GetAifadianPlanByPlanId(order.PlanID)
+	// Look up the Aifadian plan — SKU match first if present, then fall back to plan_id only
+	var aifadianPlan *model.AifadianPlan
+	if len(order.SkuDetail) > 0 {
+		skuJson := common.GetJsonString(order.SkuDetail)
+		aifadianPlan, err = model.GetAifadianPlanByPlanIdAndSku(order.PlanID, skuJson)
+	}
+	if aifadianPlan == nil {
+		aifadianPlan, err = model.GetAifadianPlanByPlanId(order.PlanID)
+	}
 	if err != nil {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 未找到 plan_id order_id=%s plan_id=%s", order.OutTradeNo, order.PlanID))
 		// Save order for manual processing
@@ -497,7 +505,7 @@ func AdminUpdateAifadianPlan(c *gin.Context) {
 		return
 	}
 
-	existing.PlanId = req.PlanId
+	// PlanId is immutable after creation
 	existing.Name = req.Name
 	existing.PlanType = req.PlanType
 	existing.SubscriptionPlanId = req.SubscriptionPlanId

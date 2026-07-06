@@ -8,7 +8,7 @@ import (
 // AifadianPlan binds an Aifadian plan_id to either a subscription plan or direct topup quota.
 type AifadianPlan struct {
 	Id        int    `json:"id" gorm:"primaryKey"`
-	PlanId    string `json:"plan_id" gorm:"type:varchar(128);uniqueIndex;not null"` // Aifadian plan_id
+	PlanId    string `json:"plan_id" gorm:"type:varchar(128);index;not null"` // Aifadian plan_id
 	Name      string `json:"name" gorm:"type:varchar(128);default:''"`              // Display name
 	PlanType  string `json:"plan_type" gorm:"type:varchar(16);not null;default:'subscription'"` // "subscription" or "topup"
 
@@ -91,6 +91,17 @@ func GetAifadianPlanById(id int) (*AifadianPlan, error) {
 func GetAifadianPlanByPlanId(planId string) (*AifadianPlan, error) {
 	var plan AifadianPlan
 	err := DB.Where("plan_id = ?", planId).First(&plan).Error
+	if err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+// GetAifadianPlanByPlanIdAndSku looks up a plan by plan_id and matching sku_config.
+// Used when the same plan_id has multiple SKU variants.
+func GetAifadianPlanByPlanIdAndSku(planId, skuJson string) (*AifadianPlan, error) {
+	var plan AifadianPlan
+	err := DB.Where("plan_id = ? AND sku_config = ?", planId, skuJson).First(&plan).Error
 	if err != nil {
 		return nil, err
 	}
