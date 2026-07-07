@@ -60,7 +60,7 @@ interface AifadianPlan {
   name: string
   plan_type: 'subscription' | 'topup'
   subscription_plan_id: number
-  quota_amount: number
+  sku_config: string
   enabled: boolean
 }
 
@@ -220,7 +220,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
     }
     setPaying(true)
     try {
-      const res = await paySubscriptionAifadian(aifadianPlan.plan_id)
+      const res = await paySubscriptionAifadian(aifadianPlan.plan_id, aifadianPlan.sku_config || undefined)
       if (res.success && res.data?.url) {
         toast.success(t('Redirecting to Aifadian...'))
         window.open(res.data.url, '_blank')

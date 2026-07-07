@@ -372,18 +372,26 @@ func AifadianPayURL(c *gin.Context) {
 		return
 	}
 
+	skuParam := c.Query("sku")
+
 	monthStr := c.DefaultQuery("month", "1")
 	month, err := strconv.Atoi(monthStr)
 	if err != nil || month < 1 {
 		month = 1
 	}
 
+	// Look up the plan — SKU match first if provided
+	var aifadianPlan *model.AifadianPlan
+	if skuParam != "" {
+		aifadianPlan, err = model.GetAifadianPlanByPlanIdAndSku(planId, skuParam)
+	}
+	if aifadianPlan == nil {
+		aifadianPlan, err = model.GetAifadianPlanByPlanId(planId)
+	}
+	hasSku := aifadianPlan != nil && strings.TrimSpace(aifadianPlan.SkuConfig) != ""
+
 	// Build remark: "用户名:wxkj;用户ID:1。请勿修改或者删除这里的信息以防充值不到账"
 	remark := fmt.Sprintf("用户名:%s;用户ID:%d。请勿修改或者删除这里的信息以防充值不到账", user.Username, userId)
-
-	// Look up the plan to check for SKU config
-	aifadianPlan, err := model.GetAifadianPlanByPlanId(planId)
-	hasSku := err == nil && aifadianPlan != nil && strings.TrimSpace(aifadianPlan.SkuConfig) != ""
 
 	// Build the Aifadian payment URL
 	v := url.Values{}

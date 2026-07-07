@@ -183,11 +183,12 @@ export async function paySubscriptionEpay(
 // ============================================================================
 
 export async function paySubscriptionAifadian(
-  planId: string
+  planId: string,
+  sku?: string
 ): Promise<AifadianPayUrlResponse> {
-  const res = await api.get('/api/user/topup/aifadian', {
-    params: { plan_id: planId, month: 1 },
-  })
+  const params: Record<string, string | number> = { plan_id: planId, month: 1 }
+  if (sku) params.sku = sku
+  const res = await api.get('/api/user/topup/aifadian', { params })
   return res.data
 }
 
@@ -203,7 +204,7 @@ export async function getAifadianPlans(): Promise<{
     name: string
     plan_type: 'subscription' | 'topup'
     subscription_plan_id: number
-    quota_amount: number
+    sku_config: string
     enabled: boolean
   }>
 }> {
