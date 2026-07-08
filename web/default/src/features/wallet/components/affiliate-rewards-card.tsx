@@ -17,19 +17,29 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Share2 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { api } from '@/lib/api'
 import { formatQuota } from '@/lib/format'
 
 import type { UserWalletData } from '../types'
 
 interface AffiliateRewardsCardProps {
   user: UserWalletData | null
+  affiliateCode: string
   affiliateLink: string
   onTransfer: () => void
   complianceConfirmed?: boolean
@@ -38,12 +48,33 @@ interface AffiliateRewardsCardProps {
 
 export function AffiliateRewardsCard({
   user,
+  affiliateCode,
   affiliateLink,
   onTransfer,
   complianceConfirmed = true,
   loading,
 }: AffiliateRewardsCardProps) {
   const { t } = useTranslation()
+  const [qrOpen, setQrOpen] = useState(false)
+  const [qrData, setQrData] = useState<{
+    scene: string
+    qr_image: string
+  } | null>(null)
+  const [qrLoading, setQrLoading] = useState(false)
+
+  const handleGetReferralQr = async () => {
+    try {
+      setQrLoading(true)
+      const res = await api.get('/api/wechat-mp/referral')
+      if (res.data.success && res.data.data) {
+        setQrData(res.data.data)
+        setQrOpen(true)
+      }
+    } finally {
+      setQrLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <Card data-card-hover='false' className='bg-muted/20 py-0'>
@@ -62,6 +93,7 @@ export function AffiliateRewardsCard({
   const hasRewards = (user?.aff_quota ?? 0) > 0
 
   return (
+    <>
     <Card data-card-hover='false' className='bg-muted/20 py-0'>
       <CardContent className='grid gap-3 p-3 sm:gap-4 sm:p-4 lg:grid-cols-[minmax(200px,1fr)_minmax(180px,0.65fr)_minmax(280px,1fr)] lg:items-center'>
         <div className='flex min-w-0 items-center gap-2.5'>
@@ -111,6 +143,17 @@ export function AffiliateRewardsCard({
             tooltip={t('Copy referral link')}
             aria-label={t('Copy referral link')}
           />
+          {affiliateCode && (
+            <Button
+              variant='outline'
+              onClick={handleGetReferralQr}
+              disabled={qrLoading}
+              className='h-9 shrink-0 px-3'
+              size='sm'
+            >
+              {t('Mini Program QR')}
+            </Button>
+          )}
           {hasRewards && (
             <Button
               onClick={onTransfer}
@@ -131,5 +174,32 @@ export function AffiliateRewardsCard({
         ) : null}
       </CardContent>
     </Card>
+
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent className='sm:max-w-sm'>
+          <DialogHeader>
+            <DialogTitle>{t('Mini Program QR')}</DialogTitle>
+            <DialogDescription>
+              {t('Scan to join via Mini Program')}
+            </DialogDescription>
+          </DialogHeader>
+          {qrData && (
+            <div className='flex flex-col items-center gap-4'>
+              <img
+                src={qrData.qr_image}
+                alt={t('Mini Program QR')}
+                className='size-64 rounded-lg object-contain'
+              />
+              <div className='text-muted-foreground text-center'>
+                <p className='text-xs'>{t('Scene Code')}</p>
+                <p className='mt-1 font-mono text-sm font-medium'>
+                  {qrData.scene}
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

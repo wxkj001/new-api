@@ -393,3 +393,68 @@ func generateUserAccessToken(user *model.User) error {
 
 	return nil
 }
+
+// WeChatMpReferralURL returns a user's permanent referral QR code.
+// If the user doesn't have one yet, a new one is generated.
+// GET /api/wechat-mp/referral (requires auth)
+func WeChatMpReferralURL(c *gin.Context) {
+	userId := c.GetInt("id")
+
+	// Get user's affiliate code
+	user, err := model.GetUserById(userId, false)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "用户不存在"})
+		return
+	}
+	affCode := user.AffCode
+	if affCode == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "未生成推荐码，请先获取推荐链接"})
+		return
+	}
+	scene := "aff_" + affCode
+
+	// Check if user already has a referral code with this scene
+	existing, err := model.GetWeChatMpReferralCodeByUserId(userId)
+	if err == nil && existing != nil && existing.Scene == scene && len(existing.QrImage) > 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": gin.H{
+				"scene":    existing.Scene,
+				"qr_image": "data:image/png;base64," + base64.StdEncoding.EncodeToString(existing.QrImage),
+			},
+		})
+		return
+	}
+
+	// Generate new referral QR code with aff_code as scene
+	mp := getMiniProgram()
+	qrImage, err := mp.GetQRCode().GetWXACodeUnlimit(qrcode.QRCoder{
+		Scene: scene,
+		Page:  common.WeChatMpReferralPagePath,
+		Width: 430,
+	})
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] ReferralURL: GetWXACodeUnlimit error: %s", err.Error()))
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "生成推荐码失败"})
+		return
+	}
+
+	// Upsert: delete old then insert new if affCode changed
+	if existing != nil {
+		model.DB.Where("user_id = ?", userId).Delete(&model.WeChatMpReferralCode{})
+	}
+
+	if err := model.CreateWeChatMpReferralCode(userId, scene, qrImage); err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] ReferralURL: create error: %s", err.Error()))
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "保存推荐码失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"scene":    scene,
+			"qr_image": "data:image/png;base64," + base64.StdEncoding.EncodeToString(qrImage),
+		},
+	})
+}

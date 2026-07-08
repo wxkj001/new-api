@@ -188,6 +188,17 @@ export async function transferAffiliateQuota(
 }
 
 /**
+ * Get WeChat Mini Program referral QR code
+ */
+export async function getWeChatMpReferral(): Promise<{
+  success: boolean
+  data?: { scene: string; qr_image: string }
+}> {
+  const res = await api.get('/api/wechat-mp/referral')
+  return res.data
+}
+
+/**
  * Get billing history for current user
  */
 export async function getUserBillingHistory(

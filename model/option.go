@@ -133,6 +133,7 @@ func InitOptionMap() {
 	common.OptionMap["WeChatMpAppSecret"] = ""
 	common.OptionMap["WeChatMpToken"] = ""
 	common.OptionMap["WeChatMpPagePath"] = ""
+	common.OptionMap["WeChatMpReferralPagePath"] = ""
 	common.OptionMap["WeChatMpMaxQrCodes"] = strconv.Itoa(common.WeChatMpMaxQrCodes)
 	common.OptionMap["TurnstileSiteKey"] = ""
 	common.OptionMap["TurnstileSecretKey"] = ""
@@ -508,6 +509,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.WeChatMpToken = value
 	case "WeChatMpPagePath":
 		common.WeChatMpPagePath = value
+	case "WeChatMpReferralPagePath":
+		common.WeChatMpReferralPagePath = value
 	case "WeChatMpMaxQrCodes":
 		common.WeChatMpMaxQrCodes, _ = strconv.Atoi(value)
 	case "TelegramBotToken":

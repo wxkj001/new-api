@@ -3,6 +3,8 @@ package model
 import (
 	"errors"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // AifadianPlan binds an Aifadian plan_id to either a subscription plan or direct topup quota.
@@ -28,14 +30,14 @@ func (AifadianPlan) TableName() string {
 	return "aifadian_plans"
 }
 
-func (p *AifadianPlan) BeforeCreate() error {
+func (p *AifadianPlan) BeforeCreate(tx *gorm.DB) error {
 	now := time.Now().Unix()
 	p.CreatedAt = now
 	p.UpdatedAt = now
 	return nil
 }
 
-func (p *AifadianPlan) BeforeUpdate() error {
+func (p *AifadianPlan) BeforeUpdate(tx *gorm.DB) error {
 	p.UpdatedAt = time.Now().Unix()
 	return nil
 }
@@ -60,7 +62,7 @@ func (AifadianOrder) TableName() string {
 	return "aifadian_orders"
 }
 
-func (o *AifadianOrder) BeforeCreate() error {
+func (o *AifadianOrder) BeforeCreate(tx *gorm.DB) error {
 	o.CreatedAt = time.Now().Unix()
 	return nil
 }

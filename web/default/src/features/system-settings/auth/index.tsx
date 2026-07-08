@@ -60,6 +60,7 @@ const defaultAuthSettings: AuthSettings = {
   WeChatMpAppId: '',
   WeChatMpAppSecret: '',
   WeChatMpPagePath: '',
+  WeChatMpReferralPagePath: '',
   WeChatMpMaxQrCodes: '3',
   TurnstileCheckEnabled: false,
   TurnstileSiteKey: '',

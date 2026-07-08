@@ -87,6 +87,7 @@ const oauthSchema = z.object({
   WeChatMpAppId: z.string(),
   WeChatMpAppSecret: z.string(),
   WeChatMpPagePath: z.string(),
+  WeChatMpReferralPagePath: z.string(),
   WeChatMpMaxQrCodes: z.string(),
 })
 
@@ -121,6 +122,7 @@ type FlatOAuthDefaults = {
   WeChatMpAppId: string
   WeChatMpAppSecret: string
   WeChatMpPagePath: string
+  WeChatMpReferralPagePath: string
   WeChatMpMaxQrCodes: string
 }
 
@@ -160,6 +162,7 @@ const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
   WeChatMpAppId: defaults.WeChatMpAppId ?? '',
   WeChatMpAppSecret: defaults.WeChatMpAppSecret ?? '',
   WeChatMpPagePath: defaults.WeChatMpPagePath ?? '',
+  WeChatMpReferralPagePath: defaults.WeChatMpReferralPagePath ?? '',
   WeChatMpMaxQrCodes: defaults.WeChatMpMaxQrCodes ?? '',
 })
 
@@ -192,6 +195,7 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
   WeChatMpAppId: values.WeChatMpAppId,
   WeChatMpAppSecret: values.WeChatMpAppSecret,
   WeChatMpPagePath: values.WeChatMpPagePath,
+  WeChatMpReferralPagePath: values.WeChatMpReferralPagePath,
   WeChatMpMaxQrCodes: values.WeChatMpMaxQrCodes,
 })
 
@@ -1016,6 +1020,35 @@ export function OAuthSection(props: OAuthSectionProps) {
                       </FormControl>
                       <FormDescription>
                         {t('Mini Program page to open, leave empty for home page')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='WeChatMpReferralPagePath'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Referral Page Path')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t('pages/index/index')}
+                          autoComplete='off'
+                          value={field.value ?? ''}
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
+                          name={field.name}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Page for referral QR, empty uses login page path'
+                        )}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

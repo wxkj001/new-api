@@ -54,6 +54,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/wechat-mp/url", middleware.CriticalRateLimit(), controller.WeChatMpGenerateURL)
 		apiRouter.GET("/wechat-mp/status", controller.WeChatMpCheckStatus)
 		apiRouter.POST("/wechat-mp/login", controller.WeChatMpLogin)
+		// WeChat Mini Program - permanent referral QR code
+		apiRouter.GET("/wechat-mp/referral", middleware.UserAuth(), controller.WeChatMpReferralURL)
 		// Standard OAuth providers (GitHub, Discord, OIDC, LinuxDO) - unified route
 		apiRouter.GET("/oauth/:provider", middleware.CriticalRateLimit(), controller.HandleOAuth)
 		apiRouter.GET("/ratio_config", middleware.CriticalRateLimit(), controller.GetRatioConfig)

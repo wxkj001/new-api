@@ -144,6 +144,7 @@ var WeChatMpAppId = ""
 var WeChatMpAppSecret = ""
 var WeChatMpToken = ""
 var WeChatMpPagePath = ""
+var WeChatMpReferralPagePath = ""
 var WeChatMpMaxQrCodes = 3
 
 var TurnstileSiteKey = ""

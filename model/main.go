@@ -302,6 +302,7 @@ func migrateDB() error {
 		&CasbinRule{},
 		&AuthzRole{},
 		&WeChatMpLoginCode{},
+		&WeChatMpReferralCode{},
 	)
 	if err != nil {
 		return err

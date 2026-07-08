@@ -77,6 +77,7 @@ const AUTH_SECTIONS = [
           WeChatMpAppId: settings.WeChatMpAppId,
           WeChatMpAppSecret: settings.WeChatMpAppSecret,
           WeChatMpPagePath: settings.WeChatMpPagePath,
+          WeChatMpReferralPagePath: settings.WeChatMpReferralPagePath,
           WeChatMpMaxQrCodes: settings.WeChatMpMaxQrCodes,
         }}
       />
