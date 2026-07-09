@@ -135,7 +135,7 @@ func WeChatMpGenerateURL(c *gin.Context) {
 // WeChatMpLoginRequest 小程序登录请求体
 type WeChatMpLoginRequest struct {
 	// Scene 二维码中的 scene 值，用于关联本次登录与 polling 记录
-	Scene string `json:"scene" binding:"required"`
+	Scene string `json:"scene"`
 	// Code 小程序 wx.login() 返回的 js_code，用于换取 openid
 	Code string `json:"code" binding:"required"`
 }
@@ -159,25 +159,23 @@ func WeChatMpLogin(c *gin.Context) {
 		return
 	}
 
-	// 校验 scene 对应的 polling 记录
+	// 校验 scene 对应的 polling 记录（可选：网页扫码时存在，小程序直接登录时不存在）
 	loginEntry, err := model.GetWeChatMpLoginCodeByScene(req.Scene)
 	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: scene not found or not pending: %s, err=%v", req.Scene, err))
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "Invalid or expired login code",
-		})
-		return
-	}
-
-	// 检查是否过期
-	if time.Now().After(loginEntry.ExpiresAt) {
-		model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code)
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "Login code expired",
-		})
-		return
+		// Scene not in DB — this is a direct mini-program login, not a web QR scan.
+		// Log and continue; the polling-related steps below are skipped.
+		logger.LogDebug(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: scene not in DB (direct login): %s", req.Scene))
+		loginEntry = nil
+	} else {
+		// Scene exists — check expiry
+		if time.Now().After(loginEntry.ExpiresAt) {
+			if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Login code expired",
+			})
+			return
+		}
 	}
 
 	// 调用微信 Code2Session 接口，用 js_code 换取 openid 和 session_key
@@ -185,7 +183,7 @@ func WeChatMpLogin(c *gin.Context) {
 	session, err := mp.GetAuth().Code2Session(req.Code)
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: Code2Session error: %s", err.Error()))
-		model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code)
+		if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "WeChat authorization failed",
@@ -196,7 +194,7 @@ func WeChatMpLogin(c *gin.Context) {
 	openId := session.OpenID
 	if openId == "" {
 		logger.LogError(c.Request.Context(), "[WeChatMp] Login: empty openid from Code2Session")
-		model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code)
+		if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "Failed to get WeChat user info",
@@ -213,7 +211,7 @@ func WeChatMpLogin(c *gin.Context) {
 		user.WeChatMpOpenId = openId
 		if err := user.FillUserByWeChatMpOpenId(); err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: fill user error: %s", err.Error()))
-			model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code)
+			if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "Failed to find user",
@@ -221,7 +219,7 @@ func WeChatMpLogin(c *gin.Context) {
 			return
 		}
 		if user.Id == 0 {
-			model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code)
+			if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "User has been deleted",
@@ -231,7 +229,7 @@ func WeChatMpLogin(c *gin.Context) {
 	} else {
 		// 新用户：检查注册是否开启
 		if !common.RegisterEnabled {
-			model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code)
+			if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "Registration is disabled",
@@ -248,7 +246,7 @@ func WeChatMpLogin(c *gin.Context) {
 
 		if err := user.Insert(0); err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: create user error: %s", err.Error()))
-			model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code)
+			if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "Failed to create user",
@@ -264,14 +262,13 @@ func WeChatMpLogin(c *gin.Context) {
 	}
 
 	// 标记 polling 记录为登录成功
-	if err := model.UpdateWeChatMpLoginCodeSuccess(loginEntry.Code, user.Id); err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: update code success error: %s", err.Error()))
+	if loginEntry != nil {
+		if err := model.UpdateWeChatMpLoginCodeSuccess(loginEntry.Code, user.Id); err != nil {
+			logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: update code success error: %s", err.Error()))
+		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Login successful",
-	})
+	setupLogin(&user, c)
 }
 
 // WeChatMpCheckStatus 供 Web 前端轮询登录状态
@@ -457,4 +454,118 @@ func WeChatMpReferralURL(c *gin.Context) {
 			"qr_image": "data:image/png;base64," + base64.StdEncoding.EncodeToString(qrImage),
 		},
 	})
+}
+
+// WeChatMpLoginReferralRequest is the request body for referral code login
+type WeChatMpLoginReferralRequest struct {
+	AffCode string `json:"aff_code" binding:"required"`
+	Code    string `json:"code" binding:"required"`
+}
+
+// WeChatMpLoginReferral handles mini-program login via referral/affiliate code.
+// POST /api/wechat-mp/login-referral
+//
+// Flow:
+//  1. Validate aff_code exists -- get inviter's user ID
+//  2. Call WeChat Code2Session to exchange js_code for openid
+//  3. Existing user -- login directly
+//  4. New user -- auto-register with InviterId set, generate API key
+//  5. Call setupLogin to set session and return user data
+func WeChatMpLoginReferral(c *gin.Context) {
+	var req WeChatMpLoginReferralRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Invalid request parameters",
+		})
+		return
+	}
+
+	// Validate referral code exists
+	inviterId, err := model.GetUserIdByAffCode(req.AffCode)
+	if err != nil || inviterId == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Invalid referral code",
+		})
+		return
+	}
+
+	// Call WeChat Code2Session to get openid
+	mp := getMiniProgram()
+	session, err := mp.GetAuth().Code2Session(req.Code)
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] LoginReferral: Code2Session error: %s", err.Error()))
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "WeChat authorization failed",
+		})
+		return
+	}
+
+	openId := session.OpenID
+	if openId == "" {
+		logger.LogError(c.Request.Context(), "[WeChatMp] LoginReferral: empty openid from Code2Session")
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Failed to get WeChat user info",
+		})
+		return
+	}
+
+	logger.LogDebug(c.Request.Context(), fmt.Sprintf("[WeChatMp] LoginReferral: openid=%s, aff_code=%s", openId, req.AffCode))
+
+	// Find or create user by openid
+	var user model.User
+	if model.IsWeChatMpOpenIdAlreadyTaken(openId) {
+		user.WeChatMpOpenId = openId
+		if err := user.FillUserByWeChatMpOpenId(); err != nil {
+			logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] LoginReferral: fill user error: %s", err.Error()))
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Failed to find user",
+			})
+			return
+		}
+		if user.Id == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "User has been deleted",
+			})
+			return
+		}
+	} else {
+		if !common.RegisterEnabled {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Registration is disabled",
+			})
+			return
+		}
+
+		// Create new user linked to inviter
+		user.Username = "wxmp_" + strconv.Itoa(model.GetMaxUserId()+1)
+		user.DisplayName = "WeChat MP User"
+		user.WeChatMpOpenId = openId
+		user.Role = common.RoleCommonUser
+		user.Status = common.UserStatusEnabled
+		user.InviterId = inviterId
+
+		if err := user.Insert(inviterId); err != nil {
+			logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] LoginReferral: create user error: %s", err.Error()))
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Failed to create user",
+			})
+			return
+		}
+
+		// Auto-generate API key for the new user
+		if err := generateUserAccessToken(&user); err != nil {
+			logger.LogWarn(c.Request.Context(), fmt.Sprintf("[WeChatMp] LoginReferral: generate token error: %s", err.Error()))
+		}
+	}
+
+	// Set session and return user data
+	setupLogin(&user, c)
 }
