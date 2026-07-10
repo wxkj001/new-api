@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "active_work_id": "wechat-mp-referral-ui-60a8c209",
+  "works": {
+    "wechat-mp-referral-ui-60a8c209": {
+      "work_id": "wechat-mp-referral-ui-60a8c209",
+      "active_plan": "C:\\Users\\Administrator\\app\\new-api\\.omo\\plans\\wechat-mp-referral-ui.md",
+      "plan_name": "wechat-mp-referral-ui",
+      "status": "active",
+      "started_at": "2026-07-10T03:33:17.101Z",
+      "updated_at": "2026-07-10T03:33:17.101Z",
+      "session_ids": [
+        "opencode:ses_0e34534bcffe3hwP4oX6yY8Tn8"
+      ],
+      "session_origins": {
+        "opencode:ses_0e34534bcffe3hwP4oX6yY8Tn8": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    }
+  },
+  "active_plan": "C:\\Users\\Administrator\\app\\new-api\\.omo\\plans\\wechat-mp-referral-ui.md",
+  "started_at": "2026-07-10T03:33:17.101Z",
+  "status": "active",
+  "updated_at": "2026-07-10T03:33:17.101Z",
+  "session_ids": [
+    "opencode:ses_0e34534bcffe3hwP4oX6yY8Tn8"
+  ],
+  "session_origins": {
+    "opencode:ses_0e34534bcffe3hwP4oX6yY8Tn8": "direct"
+  },
+  "plan_name": "wechat-mp-referral-ui",
+  "task_sessions": {},
+  "agent": "atlas"
+}

@@ -128,3 +128,10 @@ func CountWeChatMpQrCodes() int64 {
 	DB.Model(&WeChatMpLoginCode{}).Where("qr_image IS NOT NULL").Count(&count)
 	return count
 }
+
+// ClearWeChatMpQrImages sets all cached QR images to NULL,
+// forcing the next GetWXACodeUnlimit call to regenerate them with the current page path.
+func ClearWeChatMpQrImages() error {
+	return DB.Model(&WeChatMpLoginCode{}).Where("qr_image IS NOT NULL").
+		Update("qr_image", nil).Error
+}

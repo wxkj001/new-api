@@ -509,6 +509,10 @@ func updateOptionMap(key string, value string) (err error) {
 	case "WeChatMpToken":
 		common.WeChatMpToken = value
 	case "WeChatMpPagePath":
+		if common.WeChatMpPagePath != value && common.WeChatMpPagePath != "" {
+			// Page path changed — clear cached QR images so they regenerate with the new path
+			go ClearWeChatMpQrImages()
+		}
 		common.WeChatMpPagePath = value
 	case "WeChatMpReferralPagePath":
 		common.WeChatMpReferralPagePath = value
