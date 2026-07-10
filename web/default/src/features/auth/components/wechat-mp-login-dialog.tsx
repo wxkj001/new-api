@@ -33,6 +33,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { checkWeChatMpStatus, generateWeChatMpUrl } from '../api'
+import { useAuthRedirect } from '../hooks/use-auth-redirect'
 import type { WeChatMpStatus } from '../api'
 
 const POLLING_INTERVAL_MS = 2000
@@ -48,6 +49,7 @@ export function WeChatMpLoginDialog({
   onOpenChange,
 }: WeChatMpLoginDialogProps) {
   const { t } = useTranslation()
+  const { handleLoginSuccess } = useAuthRedirect()
 
   const [status, setStatus] = useState<WeChatMpStatus>('pending')
   const [code, setCode] = useState('')
@@ -136,7 +138,10 @@ export function WeChatMpLoginDialog({
 	        if (res.status === 'success' || (res.success && res.data)) {
 	          stopPolling()
 	          handleClose(false)
-	          window.location.href = '/'
+	          handleLoginSuccess(
+	            res.data as { id?: number } | null,
+	            '/'
+	          )
 	        } else if (res.status === 'failed') {
           stopPolling()
           setStatus('failed')
