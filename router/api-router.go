@@ -52,8 +52,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/oauth/telegram/bind", middleware.CriticalRateLimit(), controller.TelegramBind)
 		// WeChat Mini Program OAuth - scan-to-login flow
 		apiRouter.POST("/wechat-mp/url", middleware.CriticalRateLimit(), controller.WeChatMpGenerateURL)
-		apiRouter.GET("/wechat-mp/status", controller.WeChatMpCheckStatus)
-		apiRouter.POST("/wechat-mp/login", controller.WeChatMpLogin)
+	apiRouter.GET("/wechat-mp/status", controller.WeChatMpCheckStatus)
+	apiRouter.POST("/wechat-mp/login", controller.WeChatMpLogin)
 		apiRouter.POST("/wechat-mp/login-referral", middleware.CriticalRateLimit(), controller.WeChatMpLoginReferral)
 		// WeChat Mini Program - permanent referral QR code
 		apiRouter.GET("/wechat-mp/referral", middleware.UserAuth(), controller.WeChatMpReferralURL)

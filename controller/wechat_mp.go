@@ -159,24 +159,30 @@ func WeChatMpLogin(c *gin.Context) {
 		return
 	}
 
-	// 校验 scene 对应的 polling 记录（可选：网页扫码时存在，小程序直接登录时不存在）
-	loginEntry, err := model.GetWeChatMpLoginCodeByScene(req.Scene)
-	if err != nil {
-		// Scene not in DB — this is a direct mini-program login, not a web QR scan.
-		// Log and continue; the polling-related steps below are skipped.
-		logger.LogDebug(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: scene not in DB (direct login): %s", req.Scene))
-		loginEntry = nil
-	} else {
-		// Scene exists — check expiry
-		if time.Now().After(loginEntry.ExpiresAt) {
-			if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
+	var loginEntry *model.WeChatMpLoginCode
+
+	if req.Scene != "" {
+		// QR scan login — strict polling validation
+		entry, err := model.GetWeChatMpLoginCodeByScene(req.Scene)
+		if err != nil {
+			logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: scene not found or not pending: %s, err=%v", req.Scene, err))
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Invalid or expired login code",
+			})
+			return
+		}
+		if time.Now().After(entry.ExpiresAt) {
+			model.UpdateWeChatMpLoginCodeFailed(entry.Code)
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": "Login code expired",
 			})
 			return
 		}
+		loginEntry = entry
 	}
+	// else: scene is empty — direct mini-program login, skip polling
 
 	// 调用微信 Code2Session 接口，用 js_code 换取 openid 和 session_key
 	mp := getMiniProgram()
@@ -207,7 +213,6 @@ func WeChatMpLogin(c *gin.Context) {
 	// 根据 openid 查找或创建用户
 	var user model.User
 	if model.IsWeChatMpOpenIdAlreadyTaken(openId) {
-		// 已有用户：填充用户信息
 		user.WeChatMpOpenId = openId
 		if err := user.FillUserByWeChatMpOpenId(); err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: fill user error: %s", err.Error()))
@@ -227,7 +232,6 @@ func WeChatMpLogin(c *gin.Context) {
 			return
 		}
 	} else {
-		// 新用户：检查注册是否开启
 		if !common.RegisterEnabled {
 			if loginEntry != nil { model.UpdateWeChatMpLoginCodeFailed(loginEntry.Code) }
 			c.JSON(http.StatusOK, gin.H{
@@ -237,7 +241,6 @@ func WeChatMpLogin(c *gin.Context) {
 			return
 		}
 
-		// 创建新用户
 		user.Username = "wxmp_" + strconv.Itoa(model.GetMaxUserId()+1)
 		user.DisplayName = "WeChat MP User"
 		user.WeChatMpOpenId = openId
@@ -254,10 +257,8 @@ func WeChatMpLogin(c *gin.Context) {
 			return
 		}
 
-		// 为新用户自动生成 API Key（Token），方便扫码后直接使用
 		if err := generateUserAccessToken(&user); err != nil {
 			logger.LogWarn(c.Request.Context(), fmt.Sprintf("[WeChatMp] Login: generate token error: %s", err.Error()))
-			// 生成失败不阻塞登录，用户可后续在控制台手动生成
 		}
 	}
 
@@ -318,7 +319,7 @@ func WeChatMpCheckStatus(c *gin.Context) {
 		})
 
 	case model.WeChatMpCodeStatusSuccess:
-		// 登录成功：获取用户信息并设置会话
+		// 登录成功：设置会话和 cookie，返回用户信息
 		user := model.User{Id: loginEntry.UserId}
 		if err := user.FillUserById(); err != nil {
 			c.JSON(http.StatusOK, gin.H{
@@ -338,7 +339,6 @@ func WeChatMpCheckStatus(c *gin.Context) {
 			return
 		}
 
-		// 设置会话和 cookie，返回用户信息
 		setupLogin(&user, c)
 
 	case model.WeChatMpCodeStatusFailed, model.WeChatMpCodeStatusExpired:

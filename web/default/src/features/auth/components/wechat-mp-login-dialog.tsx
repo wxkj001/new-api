@@ -132,12 +132,12 @@ export function WeChatMpLoginDialog({
         return
       }
 
-      void checkWeChatMpStatus(code).then((res) => {
-        if (res.status === 'success') {
-          stopPolling()
-          handleClose(false)
-          window.location.href = '/'
-        } else if (res.status === 'failed') {
+	      void checkWeChatMpStatus(code).then((res) => {
+	        if (res.status === 'success' || (res.success && res.data)) {
+	          stopPolling()
+	          handleClose(false)
+	          window.location.href = '/'
+	        } else if (res.status === 'failed') {
           stopPolling()
           setStatus('failed')
           setErrorMessage(
