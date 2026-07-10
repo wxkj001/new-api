@@ -47,6 +47,7 @@ import {
 type ModelFormValues = {
   ModelPrice: string
   ModelRatio: string
+  ProfitRatio: string
   CacheRatio: string
   CreateCacheRatio: string
   CompletionRatio: string
@@ -70,6 +71,7 @@ type ModelRatioFormProps = {
 type ModelJsonFieldName =
   | 'ModelPrice'
   | 'ModelRatio'
+  | 'ProfitRatio'
   | 'CacheRatio'
   | 'CreateCacheRatio'
   | 'CompletionRatio'
@@ -92,6 +94,12 @@ const modelJsonFields: Array<{
     name: 'ModelRatio',
     labelKey: 'Model ratio',
     descriptionKey: 'JSON map of model → multiplier applied to quota billing.',
+  },
+  {
+    name: 'ProfitRatio',
+    labelKey: 'Profit ratio',
+    descriptionKey:
+      'JSON map of model → profit multiplier. ModelRatio × ProfitRatio = actual billing ratio.',
   },
   {
     name: 'CacheRatio',

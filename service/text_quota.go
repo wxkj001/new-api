@@ -218,6 +218,17 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	dCacheRatio := decimal.NewFromFloat(summary.CacheRatio)
 	dImageRatio := decimal.NewFromFloat(summary.ImageRatio)
 	dModelRatio := decimal.NewFromFloat(summary.ModelRatio)
+	// Apply profit ratio (盈利倍率) if configured — multiplies base ModelRatio for billing only
+	common.OptionMapRWMutex.RLock()
+	if profitStr, ok := common.OptionMap["ProfitRatio"]; ok && profitStr != "" {
+		var profitMap map[string]float64
+		if common.UnmarshalJsonStr(profitStr, &profitMap) == nil {
+			if pr, exists := profitMap[summary.ModelName]; exists && pr > 0 {
+				dModelRatio = dModelRatio.Mul(decimal.NewFromFloat(pr))
+			}
+		}
+	}
+	common.OptionMapRWMutex.RUnlock()
 	dGroupRatio := decimal.NewFromFloat(summary.GroupRatio)
 	dModelPrice := decimal.NewFromFloat(summary.ModelPrice)
 	dCacheCreationRatio := decimal.NewFromFloat(summary.CacheCreationRatio)
