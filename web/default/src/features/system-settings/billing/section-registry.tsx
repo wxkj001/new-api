@@ -71,6 +71,8 @@ const BILLING_SECTIONS = [
           quota_setting: {
             enable_free_model_pre_consume:
               settings['quota_setting.enable_free_model_pre_consume'],
+            affiliate_reward_to_balance:
+              settings['quota_setting.affiliate_reward_to_balance'],
           },
         }}
         complianceConfirmed={

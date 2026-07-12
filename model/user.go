@@ -438,7 +438,11 @@ func inviteUser(inviterId int) (err error) {
 		return err
 	}
 	user.AffCount++
-	user.AffQuota += common.QuotaForInviter
+	if common.AffiliateRewardToBalance {
+		user.Quota += common.QuotaForInviter
+	} else {
+		user.AffQuota += common.QuotaForInviter
+	}
 	user.AffHistoryQuota += common.QuotaForInviter
 	return DB.Save(user).Error
 }

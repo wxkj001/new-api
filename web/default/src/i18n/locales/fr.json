@@ -5161,6 +5161,8 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Affiliate Reward to Balance": "Affiliate Reward to Balance",
+    "When enabled, referral rewards go directly to wallet balance instead of requiring manual transfer.": "When enabled, referral rewards go directly to wallet balance instead of requiring manual transfer."
   }
 }

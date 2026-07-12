@@ -61,6 +61,7 @@ const quotaSchema = z.object({
   }),
   quota_setting: z.object({
     enable_free_model_pre_consume: z.boolean(),
+    affiliate_reward_to_balance: z.boolean(),
   }),
 })
 
@@ -248,6 +249,32 @@ export function QuotaSettingsSection({
                       <FormDescription>
                         {t(
                           'When enabled, zero-cost models also pre-consume quota before final settlement.'
+                        )}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={updateOption.isPending}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+            </SettingsFormGridItem>
+
+            <SettingsFormGridItem span='full'>
+              <FormField
+                control={form.control}
+                name='quota_setting.affiliate_reward_to_balance'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Affiliate Reward to Balance')}</FormLabel>
+                      <FormDescription>
+                        {t(
+                          'When enabled, referral rewards go directly to wallet balance instead of requiring manual transfer.'
                         )}
                       </FormDescription>
                     </SettingsSwitchContent>

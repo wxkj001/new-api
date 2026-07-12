@@ -5161,6 +5161,8 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Affiliate Reward to Balance": "邀请奖励直接进余额",
+    "When enabled, referral rewards go directly to wallet balance instead of requiring manual transfer.": "开启后，邀请奖励将直接进入钱包余额，无需手动转移。"
   }
 }
