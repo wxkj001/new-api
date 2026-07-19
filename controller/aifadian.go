@@ -133,21 +133,7 @@ func AifadianWebhook(c *gin.Context) {
 	// Parse user info from remark
 	username, userId := parseAifadianRemark(order.Remark)
 	if userId <= 0 {
-		// Order already recorded — no need to insert again, just ack
-		if existingOrder != nil {
-			c.JSON(http.StatusOK, gin.H{"ec": 200})
-			return
-		}
-		// First time — save for manual processing
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 无法从 remark 解析用户信息 order_id=%s remark=%s", order.OutTradeNo, order.Remark))
-		_ = model.CreateAifadianOrder(&model.AifadianOrder{
-			OrderId:     order.OutTradeNo,
-			PlanId:      order.PlanID,
-			Remark:      order.Remark,
-			TotalAmount: order.TotalAmount,
-			OrderStatus: fmt.Sprintf("%d", order.Status),
-			ProcessMsg:  "无法解析用户信息，需要手动处理",
-		})
 		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
@@ -156,17 +142,6 @@ func AifadianWebhook(c *gin.Context) {
 	user, err := model.GetUserById(userId, false)
 	if err != nil {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 用户不存在 order_id=%s user_id=%d username=%s", order.OutTradeNo, userId, username))
-		if existingOrder == nil {
-			_ = model.CreateAifadianOrder(&model.AifadianOrder{
-				OrderId:     order.OutTradeNo,
-				UserId:      userId,
-				PlanId:      order.PlanID,
-				Remark:      order.Remark,
-				TotalAmount: order.TotalAmount,
-				OrderStatus: fmt.Sprintf("%d", order.Status),
-				ProcessMsg:  fmt.Sprintf("用户ID %d 不存在", userId),
-			})
-		}
 		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
@@ -174,17 +149,6 @@ func AifadianWebhook(c *gin.Context) {
 	// Only process "paid" status (2)
 	if order.Status != 2 {
 		logger.LogInfo(c.Request.Context(), fmt.Sprintf("爱发电 webhook 忽略非支付状态 order_id=%s status=%d", order.OutTradeNo, order.Status))
-		if existingOrder == nil {
-			_ = model.CreateAifadianOrder(&model.AifadianOrder{
-				OrderId:     order.OutTradeNo,
-				UserId:      userId,
-				PlanId:      order.PlanID,
-				Remark:      order.Remark,
-				TotalAmount: order.TotalAmount,
-				OrderStatus: fmt.Sprintf("%d", order.Status),
-				ProcessMsg:  fmt.Sprintf("非支付状态: %d", order.Status),
-			})
-		}
 		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
@@ -200,34 +164,12 @@ func AifadianWebhook(c *gin.Context) {
 	}
 	if err != nil {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook 未找到 plan_id order_id=%s plan_id=%s", order.OutTradeNo, order.PlanID))
-		if existingOrder == nil {
-			_ = model.CreateAifadianOrder(&model.AifadianOrder{
-				OrderId:     order.OutTradeNo,
-				UserId:      userId,
-				PlanId:      order.PlanID,
-				Remark:      order.Remark,
-				TotalAmount: order.TotalAmount,
-				OrderStatus: fmt.Sprintf("%d", order.Status),
-				ProcessMsg:  fmt.Sprintf("未找到 plan_id: %s 的映射配置", order.PlanID),
-			})
-		}
 		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
 
 	if !aifadianPlan.Enabled {
 		logger.LogWarn(c.Request.Context(), fmt.Sprintf("爱发电 webhook plan_id 未启用 order_id=%s plan_id=%s", order.OutTradeNo, order.PlanID))
-		if existingOrder == nil {
-			_ = model.CreateAifadianOrder(&model.AifadianOrder{
-				OrderId:     order.OutTradeNo,
-				UserId:      userId,
-				PlanId:      order.PlanID,
-				Remark:      order.Remark,
-				TotalAmount: order.TotalAmount,
-				OrderStatus: fmt.Sprintf("%d", order.Status),
-				ProcessMsg:  "该套餐未启用",
-			})
-		}
 		c.JSON(http.StatusOK, gin.H{"ec": 200})
 		return
 	}
