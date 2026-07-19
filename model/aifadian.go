@@ -1,11 +1,52 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
 	"gorm.io/gorm"
 )
+
+type aifadianSkuItem struct {
+	SkuID string `json:"sku_id"`
+}
+
+// extractSkuIds parses a JSON array of sku items and returns the sku_id list.
+func extractSkuIds(raw string) []string {
+	if raw == "" || raw == "[]" {
+		return nil
+	}
+	var items []aifadianSkuItem
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return nil
+	}
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.SkuID != "" {
+			ids = append(ids, item.SkuID)
+		}
+	}
+	return ids
+}
+
+// setEqual checks if two string slices contain the same elements (order-insensitive).
+func setEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[string]int, len(a))
+	for _, v := range a {
+		seen[v]++
+	}
+	for _, v := range b {
+		seen[v]--
+		if seen[v] < 0 {
+			return false
+		}
+	}
+	return true
+}
 
 // AifadianPlan binds an Aifadian plan_id to either a subscription plan or direct topup quota.
 type AifadianPlan struct {
@@ -99,15 +140,28 @@ func GetAifadianPlanByPlanId(planId string) (*AifadianPlan, error) {
 	return &plan, nil
 }
 
-// GetAifadianPlanByPlanIdAndSku looks up a plan by plan_id and matching sku_config.
-// Used when the same plan_id has multiple SKU variants.
+// GetAifadianPlanByPlanIdAndSku looks up a plan by plan_id and matching sku IDs.
+// Webhook SKU JSON may contain extra fields (price, name, etc.), so we match only
+// by sku_id set rather than exact JSON string comparison.
 func GetAifadianPlanByPlanIdAndSku(planId, skuJson string) (*AifadianPlan, error) {
-	var plan AifadianPlan
-	err := DB.Where("plan_id = ? AND sku_config = ?", planId, skuJson).First(&plan).Error
-	if err != nil {
+	targetIds := extractSkuIds(skuJson)
+	if len(targetIds) == 0 {
+		return nil, errors.New("no sku_ids in webhook payload")
+	}
+
+	var plans []AifadianPlan
+	if err := DB.Where("plan_id = ? AND sku_config != '' AND sku_config != '[]'", planId).Find(&plans).Error; err != nil {
 		return nil, err
 	}
-	return &plan, nil
+
+	for i := range plans {
+		stored := extractSkuIds(plans[i].SkuConfig)
+		if setEqual(targetIds, stored) {
+			return &plans[i], nil
+		}
+	}
+
+	return nil, errors.New("no plan matches the given sku_ids")
 }
 
 func CreateAifadianPlan(plan *AifadianPlan) error {
